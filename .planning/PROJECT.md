@@ -12,11 +12,16 @@ Users get accurate, context-aware movie recommendations with transparency ("reco
 
 ### Validated
 
-(None yet — ship to validate)
+- [x] TMDB data ingestion pipeline with MongoDB storage *(Validated in Phase 01)*
+- [x] User registration/login with secure password hashing *(Validated in Phase 01)*
+- [x] Movie search and filtering (title, genre, year) *(Validated in Phase 01)*
+- [x] REST API endpoints (auth, search) *(Validated in Phase 01)*
+- [x] Offline batch processing (data ingestion) *(Validated in Phase 01)*
+- [x] Graceful error handling for external API failures *(Validated in Phase 01)*
 
 ### Active
 
-- [ ] TMDB data ingestion pipeline with MongoDB storage
+- [ ] NLP preprocessing and TF-IDF/embedding feature extraction
 - [ ] NLP preprocessing and TF-IDF/embedding feature extraction
 - [ ] Content-based recommendation using cosine similarity
 - [ ] Collaborative filtering signal from user interactions
@@ -71,11 +76,16 @@ Users get accurate, context-aware movie recommendations with transparency ("reco
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Hybrid approach (Concept 3) over pure content-based | Best cold-start resilience + high personalization potential | — Pending |
-| MongoDB over SQL | Flexible schema for heterogeneous movie metadata | — Pending |
+| MongoDB over SQL | Flexible schema for heterogeneous movie metadata | ✓ Confirmed — AsyncMongoClient with upsert semantics working well |
 | TF-IDF as primary NLP representation | Lightweight, no GPU needed, good enough for content similarity | — Pending |
-| Offline/online architecture split | Keep API response times fast despite heavy NLP processing | — Pending |
-| MUST-only scope for v1 | Late start — focus on minimum deliverable first | — Pending |
-| MongoDB Atlas free tier | Simplest setup, accessible from anywhere, matches proposal | — Pending |
+| Offline/online architecture split | Keep API response times fast despite heavy NLP processing | ✓ Confirmed — worker runs independently, API stays fast |
+| MUST-only scope for v1 | Late start — focus on minimum deliverable first | ✓ Confirmed — Phase 1 delivered full foundation on schedule |
+| MongoDB Atlas free tier | Simplest setup, accessible from anywhere, matches proposal | — Pending (using local Docker for now) |
+| TMDB v3 api_key param over Bearer header | Bearer requires Read Access Token; api_key works with standard API key | ✓ Confirmed in Phase 01 |
 
 ---
-*Last updated: 2026-03-25 after initialization*
+## Current State
+
+Phase 01 complete — full monorepo running locally. MongoDB has ~4,300 movies from TMDB. JWT auth, movie browse/search/detail UI all working. Ready for Phase 02 (NLP + content-based recommendations).
+
+*Last updated: 2026-03-25 after Phase 01 completion*
