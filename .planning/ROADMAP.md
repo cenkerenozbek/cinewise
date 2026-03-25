@@ -12,7 +12,7 @@ The build order is dictated by data dependencies, not feature desirability. Mong
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation and Data Pipeline** - Project scaffold, MongoDB, TMDB ingestion, auth, and movie search
+- [x] **Phase 1: Foundation and Data Pipeline** - Project scaffold, MongoDB, TMDB ingestion, auth, and movie search
 - [ ] **Phase 2: Content-Based Recommendation Engine** - NLP preprocessing, TF-IDF, similarity index, cold-start onboarding, and explainable recommendations
 - [ ] **Phase 3: Collaborative Filtering and Hybrid Engine** - Like/dislike feedback, collaborative filtering, hybrid blending, and system hardening
 - [ ] **Phase 4: Evaluation and Demo Preparation** - Offline evaluation metrics, UAT, performance validation, and capstone demo hardening
@@ -29,13 +29,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The offline batch pipeline ingests TMDB movie metadata (title, year, genres, cast, director, summary, poster URL, rating, vote count, and Turkish title when available) and completes within 2 hours for the target dataset
   4. Missing metadata fields in TMDB responses do not crash the ingestion pipeline or break search results
   5. TMDB API failures trigger retry with exponential backoff; the system does not lose already-ingested data
-**Plans:** 3/4 plans executed
+**Plans:** 4/4 plans executed
 
 Plans:
 - [x] 01-01-PLAN.md — Project scaffold, Docker Compose, shared models, configuration
-- [ ] 01-02-PLAN.md — FastAPI backend with JWT auth and movie search/browse API
-- [ ] 01-03-PLAN.md — TMDB batch ingestion worker pipeline
-- [ ] 01-04-PLAN.md — React frontend with auth, movie grid, search, filters, detail page
+- [x] 01-02-PLAN.md — FastAPI backend with JWT auth and movie search/browse API
+- [x] 01-03-PLAN.md — TMDB batch ingestion worker pipeline
+- [x] 01-04-PLAN.md — React frontend with auth, movie grid, search, filters, detail page
 
 ### Phase 2: Content-Based Recommendation Engine
 **Goal**: Any user — including a brand-new visitor — gets personalized, explainable movie recommendations on their first session
@@ -78,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Data Pipeline | 3/4 | In Progress|  |
+| 1. Foundation and Data Pipeline | 4/4 | Complete | 2026-03-25 |
 | 2. Content-Based Recommendation Engine | 0/TBD | Not started | - |
 | 3. Collaborative Filtering and Hybrid Engine | 0/TBD | Not started | - |
 | 4. Evaluation and Demo Preparation | 0/TBD | Not started | - |
