@@ -13,7 +13,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [ ] **DATA-02**: System stores original and Turkish titles when available
 - [ ] **DATA-03**: System stores user interactions (like/dislike and/or rating per movie)
 - [ ] **DATA-04**: System handles missing metadata fields without breaking recommendations
-- [ ] **DATA-05**: System runs offline batch pipeline for data ingestion and NLP feature generation
+- [x] **DATA-05**: System runs offline batch pipeline for data ingestion and NLP feature generation
 - [ ] **DATA-06**: Batch pipeline completes within 2 hours for target dataset size
 
 ### NLP Processing
@@ -51,7 +51,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Security & Persistence
 
-- [ ] **SEC-01**: System persists users, movies, and interactions in MongoDB
+- [x] **SEC-01**: System persists users, movies, and interactions in MongoDB
 - [ ] **SEC-02**: System stores passwords using bcrypt hashing
 - [ ] **SEC-03**: System applies rate limiting (10 requests/minute/user) on recommendation endpoints
 
@@ -101,7 +101,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-02 | Phase 1 | Pending |
 | DATA-03 | Phase 3 | Pending |
 | DATA-04 | Phase 1 | Pending |
-| DATA-05 | Phase 1 | Pending |
+| DATA-05 | Phase 1 | Complete (01-01) |
 | DATA-06 | Phase 1 | Pending |
 | NLP-01 | Phase 2 | Pending |
 | NLP-02 | Phase 2 | Pending |
@@ -124,7 +124,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | API-05 | Phase 2 | Pending |
 | API-06 | Phase 1 | Pending |
 | API-07 | Phase 3 | Pending |
-| SEC-01 | Phase 1 | Pending |
+| SEC-01 | Phase 1 | Complete (01-01) |
 | SEC-02 | Phase 1 | Pending |
 | SEC-03 | Phase 3 | Pending |
 

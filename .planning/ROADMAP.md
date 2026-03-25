@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans:** 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Project scaffold, Docker Compose, shared models, configuration
+- [x] 01-01-PLAN.md — Project scaffold, Docker Compose, shared models, configuration
 - [ ] 01-02-PLAN.md — FastAPI backend with JWT auth and movie search/browse API
 - [ ] 01-03-PLAN.md — TMDB batch ingestion worker pipeline
 - [ ] 01-04-PLAN.md — React frontend with auth, movie grid, search, filters, detail page
@@ -78,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Data Pipeline | 0/4 | Planning complete | - |
+| 1. Foundation and Data Pipeline | 1/4 | In progress | - |
 | 2. Content-Based Recommendation Engine | 0/TBD | Not started | - |
 | 3. Collaborative Filtering and Hybrid Engine | 0/TBD | Not started | - |
 | 4. Evaluation and Demo Preparation | 0/TBD | Not started | - |
