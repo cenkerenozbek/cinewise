@@ -44,25 +44,27 @@ Declared values (all multiples of 4, aligned with Tailwind's default scale as us
 
 Exceptions:
 - Chip toggle buttons (genre + mood): minimum touch target 44px height enforced via `min-h-[44px]` on mobile viewports (accessibility — WCAG 2.5.5)
-- Navbar: fixed height `py-3` (12px top/bottom) — preserve existing Navbar.tsx spacing exactly
+- Navbar: fixed height `py-3` (12px top/bottom) — preserve existing Navbar.tsx spacing exactly. **12px (`py-3`) is a legacy Navbar value — not a system token, not to be replicated in new components.**
 - Explanation text below MovieCard: `mt-1` (4px) gap between card bottom edge and explanation sentence
 
 ---
 
 ## Typography
 
+Declared weights: **400 (regular)** and **700 (bold)** — exactly 2 weights.
+
 | Role | Size | Weight | Line Height | Tailwind Class |
 |------|------|--------|-------------|----------------|
 | Body | 14px | 400 (regular) | 1.5 | `text-sm` |
-| Label | 14px | 500 (medium) | 1.4 | `text-sm font-medium` |
+| Label | 14px | 700 (bold) | 1.4 | `text-sm font-bold` |
 | Heading | 24px | 700 (bold) | 1.2 | `text-2xl font-bold` |
 | Supporting/meta | 12px | 400 (regular) | 1.4 | `text-xs` |
 
 Source: extracted from `MovieCard.tsx` (text-sm, text-xs, font-semibold), `HomePage.tsx` (text-2xl font-bold), `LoginPage.tsx` (text-sm font-medium), `Navbar.tsx` (text-xl font-bold for brand, text-sm for nav items).
 
 **Phase 2 specific typography rules:**
-- Section label above chip groups (e.g., "Select Genres", "How are you feeling?"): `text-sm font-medium text-gray-700` — same as form field labels in LoginPage
-- Chip text: `text-sm font-medium` — same weight as labels for legibility at small size
+- Section label above chip groups (e.g., "Select Genres", "How are you feeling?"): `text-sm font-bold text-gray-700` — Label role (700)
+- Chip text: `text-sm font-bold` — matches Label weight for legibility at small size
 - Explanation text below MovieCard: `text-xs text-gray-500` — 12px, weight 400 — clearly subordinate to card title
 - "Optional" label next to mood section heading: `text-xs text-gray-400 font-normal` inline after heading
 - Preference section heading on `/recommendations` page: `text-2xl font-bold text-gray-900` — consistent with HomePage h1
@@ -101,9 +103,9 @@ New components introduced in Phase 2 and their visual specifications:
 ### PreferenceChip (genre and mood chips)
 
 ```
-Unselected: bg-white border border-gray-300 rounded-full px-4 py-2 text-sm font-medium text-gray-700
+Unselected: bg-white border border-gray-300 rounded-full px-4 py-2 text-sm font-bold text-gray-700
              hover:border-blue-400 hover:text-blue-600 transition-colors cursor-pointer
-Selected:   bg-blue-600 border border-blue-600 rounded-full px-4 py-2 text-sm font-medium text-white
+Selected:   bg-blue-600 border border-blue-600 rounded-full px-4 py-2 text-sm font-bold text-white
              hover:bg-blue-700 transition-colors cursor-pointer
 Focus:      focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500
 Min touch:  min-h-[44px] (mobile only via sm:min-h-auto)
@@ -119,7 +121,7 @@ Surface:     bg-white rounded-lg shadow p-6 (consistent with LoginPage card)
 Genre group: flex flex-wrap gap-2 mt-2
 Mood group:  flex flex-wrap gap-2 mt-2
 Section gap: space-y-6 between genre block and mood block
-CTA button:  w-full py-2 px-4 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700
+CTA button:  w-full py-2 px-4 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700
              disabled:opacity-50 transition-colors (consistent with LoginPage submit button)
 ```
 
@@ -128,7 +130,7 @@ Validation error: `text-sm text-red-600 mt-1` below the genre group when no genr
 ### EditPreferencesControl (collapsible section above results grid)
 
 ```
-Trigger button: px-4 py-2 text-sm font-medium bg-white border border-gray-300 rounded-lg
+Trigger button: px-4 py-2 text-sm font-bold bg-white border border-gray-300 rounded-lg
                 hover:bg-gray-50 transition-colors (consistent with pagination buttons in HomePage)
 Expanded state: PreferenceForm renders below trigger button with mt-4 spacing
 Collapsed state: form hidden, only trigger button visible
@@ -291,3 +293,5 @@ No third-party component registries. All new UI components are hand-written Tail
 | Inline SVG icons only | Codebase scan: MovieCard.tsx |
 | Error/loading state design | CONTEXT.md §Claude's Discretion (researcher decision) |
 | EditPreferencesControl as collapsible | CONTEXT.md §Specifics ("collapsible/expandable section above the grid") |
+| Font weight collapsed to 2 (400 + 700) | UI checker revision 2026-03-26 — eliminated 500 (medium) |
+| Navbar py-3 exception documented as non-system token | UI checker revision 2026-03-26 — Dimension 5 flag |
