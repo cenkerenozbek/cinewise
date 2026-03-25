@@ -27,7 +27,7 @@ async def fetch_movie_ids(client: httpx.AsyncClient, target_count: int = 5000) -
     """Fetch movie IDs from popular and top_rated endpoints until target_count reached."""
     seen_ids = []
     seen_set = set()
-    for endpoint in ["/movie/popular", "/movie/top_rated"]:
+    for endpoint in ["/movie/popular", "/movie/top_rated", "/movie/now_playing", "/movie/upcoming"]:
         page = 1
         while len(seen_ids) < target_count:
             data = await fetch_tmdb(client, endpoint, {"page": page, "language": "en-US"})

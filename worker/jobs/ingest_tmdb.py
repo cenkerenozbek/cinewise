@@ -42,10 +42,11 @@ async def main():
     db = client[db_name]
     collection = db[MOVIES_COLLECTION]
 
-    headers = {"Authorization": f"Bearer {tmdb_api_key}"}
     start_time = time.time()
 
-    async with httpx.AsyncClient(headers=headers, timeout=30.0) as http_client:
+    async with httpx.AsyncClient(
+        params={"api_key": tmdb_api_key}, timeout=30.0
+    ) as http_client:
         logger.info(f"Fetching movie IDs (target: {target_count})...")
         movie_ids = await fetch_movie_ids(http_client, target_count=target_count)
         logger.info(f"Found {len(movie_ids)} unique movie IDs")
