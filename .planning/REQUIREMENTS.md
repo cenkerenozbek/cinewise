@@ -9,12 +9,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Data Collection
 
-- [ ] **DATA-01**: System collects movie metadata from TMDB API (title, year, genres, cast, director, summary, poster URL, rating, vote count)
-- [ ] **DATA-02**: System stores original and Turkish titles when available
+- [x] **DATA-01**: System collects movie metadata from TMDB API (title, year, genres, cast, director, summary, poster URL, rating, vote count)
+- [x] **DATA-02**: System stores original and Turkish titles when available
 - [ ] **DATA-03**: System stores user interactions (like/dislike and/or rating per movie)
-- [ ] **DATA-04**: System handles missing metadata fields without breaking recommendations
+- [x] **DATA-04**: System handles missing metadata fields without breaking recommendations
 - [x] **DATA-05**: System runs offline batch pipeline for data ingestion and NLP feature generation
-- [ ] **DATA-06**: Batch pipeline completes within 2 hours for target dataset size
+- [x] **DATA-06**: Batch pipeline completes within 2 hours for target dataset size
 
 ### NLP Processing
 
@@ -33,7 +33,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### User Interface
 
-- [ ] **UI-01**: User can register and login to create a profile
+- [x] **UI-01**: User can register and login to create a profile
 - [ ] **UI-02**: User can specify genre preferences and optional mood selection (cold-start onboarding)
 - [ ] **UI-03**: User can search movies by title and filter by genre/year
 - [ ] **UI-04**: User can view recommendation results with poster, title, year, summary, and explanation
@@ -41,18 +41,18 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### API & Backend
 
-- [ ] **API-01**: System exposes REST endpoints for movie listing/search/filtering
+- [x] **API-01**: System exposes REST endpoints for movie listing/search/filtering
 - [ ] **API-02**: System exposes REST endpoint for recommendation retrieval
 - [ ] **API-03**: System exposes REST endpoint for user feedback submission
-- [ ] **API-04**: System integrates with TMDB API with retry/backoff error handling
+- [x] **API-04**: System integrates with TMDB API with retry/backoff error handling
 - [ ] **API-05**: Recommendation API responds within 3 seconds (p95)
-- [ ] **API-06**: Search API responds within 2 seconds (p95)
+- [x] **API-06**: Search API responds within 2 seconds (p95)
 - [ ] **API-07**: System supports at least 10 concurrent users
 
 ### Security & Persistence
 
 - [x] **SEC-01**: System persists users, movies, and interactions in MongoDB
-- [ ] **SEC-02**: System stores passwords using bcrypt hashing
+- [x] **SEC-02**: System stores passwords using bcrypt hashing
 - [ ] **SEC-03**: System applies rate limiting (10 requests/minute/user) on recommendation endpoints
 
 ## v2 Requirements
@@ -97,12 +97,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
+| DATA-02 | Phase 1 | Complete |
 | DATA-03 | Phase 3 | Pending |
-| DATA-04 | Phase 1 | Pending |
+| DATA-04 | Phase 1 | Complete |
 | DATA-05 | Phase 1 | Complete (01-01) |
-| DATA-06 | Phase 1 | Pending |
+| DATA-06 | Phase 1 | Complete |
 | NLP-01 | Phase 2 | Pending |
 | NLP-02 | Phase 2 | Pending |
 | NLP-03 | Phase 2 | Pending |
@@ -112,20 +112,20 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REC-03 | Phase 3 | Pending |
 | REC-04 | Phase 3 | Pending |
 | REC-05 | Phase 2 | Pending |
-| UI-01 | Phase 1 | Pending |
+| UI-01 | Phase 1 | Complete |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 1 | Pending |
 | UI-04 | Phase 2 | Pending |
 | UI-05 | Phase 3 | Pending |
-| API-01 | Phase 1 | Pending |
+| API-01 | Phase 1 | Complete |
 | API-02 | Phase 2 | Pending |
 | API-03 | Phase 3 | Pending |
-| API-04 | Phase 1 | Pending |
+| API-04 | Phase 1 | Complete |
 | API-05 | Phase 2 | Pending |
-| API-06 | Phase 1 | Pending |
+| API-06 | Phase 1 | Complete |
 | API-07 | Phase 3 | Pending |
 | SEC-01 | Phase 1 | Complete (01-01) |
-| SEC-02 | Phase 1 | Pending |
+| SEC-02 | Phase 1 | Complete |
 | SEC-03 | Phase 3 | Pending |
 
 **Coverage:**

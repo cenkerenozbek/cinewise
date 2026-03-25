@@ -29,7 +29,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The offline batch pipeline ingests TMDB movie metadata (title, year, genres, cast, director, summary, poster URL, rating, vote count, and Turkish title when available) and completes within 2 hours for the target dataset
   4. Missing metadata fields in TMDB responses do not crash the ingestion pipeline or break search results
   5. TMDB API failures trigger retry with exponential backoff; the system does not lose already-ingested data
-**Plans:** 4 plans
+**Plans:** 3/4 plans executed
 
 Plans:
 - [x] 01-01-PLAN.md — Project scaffold, Docker Compose, shared models, configuration
@@ -78,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Data Pipeline | 1/4 | In progress | - |
+| 1. Foundation and Data Pipeline | 3/4 | In Progress|  |
 | 2. Content-Based Recommendation Engine | 0/TBD | Not started | - |
 | 3. Collaborative Filtering and Hybrid Engine | 0/TBD | Not started | - |
 | 4. Evaluation and Demo Preparation | 0/TBD | Not started | - |
