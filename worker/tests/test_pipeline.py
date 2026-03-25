@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch, call
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ class TestUpsertMovie:
         movie_doc = {
             "tmdb_id": 550,
             "title": "Fight Club",
-            "ingested_at": datetime.utcnow(),
+            "ingested_at": datetime.now(timezone.utc),
         }
 
         await upsert_movie(mock_collection, movie_doc)
