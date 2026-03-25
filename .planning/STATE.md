@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-03-25T13:59:30Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-03-25T14:09:05.909Z"
 progress:
   total_phases: 4
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -46,6 +46,7 @@ Plan: 2 of 4
 - Trend: establishing baseline
 
 *Updated after each plan completion*
+| Phase 01 P02 | 4 | 2 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -62,6 +63,9 @@ Recent decisions affecting current work:
 - [01-01]: FastAPI lifespan for DB connection + index creation; indexes on movies.title (text) and genres+year (compound)
 - [01-01]: Tailwind CSS v4 with @tailwindcss/vite plugin; @import "tailwindcss" replaces @tailwind directives
 - [01-01]: Single .env at repo root shared by all services via docker-compose env_file directive
+- [Phase 01-02]: Pin bcrypt<5.0 — passlib 1.7.x incompatible with bcrypt 5.x (removed 72-byte truncation)
+- [Phase 01-02]: MovieRepository uses regex search for mongomock test compatibility; text index still used in real MongoDB for performance
+- [Phase 01-02]: AsyncDatabase/AsyncCollection wrappers in conftest make mongomock awaitable without changing repository code
 
 ### Pending Todos
 
@@ -75,6 +79,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T13:59:30Z
-Stopped at: Completed 01-01-PLAN.md
-Resume file: .planning/phases/01-foundation-and-data-pipeline/01-02-PLAN.md
+Last session: 2026-03-25T14:09:05.906Z
+Stopped at: Completed 01-02-PLAN.md
+Resume file: None
