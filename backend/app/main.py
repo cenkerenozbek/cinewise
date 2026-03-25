@@ -6,6 +6,7 @@ from pymongo import AsyncMongoClient
 
 from app.core.config import settings
 from app.api.routes.auth import router as auth_router
+from app.api.routes.movies import router as movies_router
 
 
 @asynccontextmanager
@@ -41,6 +42,7 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth_router)
+app.include_router(movies_router)
 
 
 @app.get("/api/health")
