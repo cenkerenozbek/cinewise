@@ -29,7 +29,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The offline batch pipeline ingests TMDB movie metadata (title, year, genres, cast, director, summary, poster URL, rating, vote count, and Turkish title when available) and completes within 2 hours for the target dataset
   4. Missing metadata fields in TMDB responses do not crash the ingestion pipeline or break search results
   5. TMDB API failures trigger retry with exponential backoff; the system does not lose already-ingested data
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Project scaffold, Docker Compose, shared models, configuration
+- [ ] 01-02-PLAN.md — FastAPI backend with JWT auth and movie search/browse API
+- [ ] 01-03-PLAN.md — TMDB batch ingestion worker pipeline
+- [ ] 01-04-PLAN.md — React frontend with auth, movie grid, search, filters, detail page
 
 ### Phase 2: Content-Based Recommendation Engine
 **Goal**: Any user — including a brand-new visitor — gets personalized, explainable movie recommendations on their first session
@@ -72,7 +78,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation and Data Pipeline | 0/TBD | Not started | - |
+| 1. Foundation and Data Pipeline | 0/4 | Planning complete | - |
 | 2. Content-Based Recommendation Engine | 0/TBD | Not started | - |
 | 3. Collaborative Filtering and Hybrid Engine | 0/TBD | Not started | - |
 | 4. Evaluation and Demo Preparation | 0/TBD | Not started | - |
