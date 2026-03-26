@@ -36,3 +36,24 @@ export interface AuthState {
   register: (email: string, password: string) => Promise<void>;
   logout: () => void;
 }
+
+export interface RecommendationItem {
+  tmdb_id: number;
+  title: string;
+  title_tr: string | null;
+  year: number | null;
+  genres: string[];
+  poster_path: string | null;
+  rating: number | null;
+  overview: string | null;
+  explanation: string;
+}
+
+export interface RecommendationResponse {
+  recommendations: RecommendationItem[];
+}
+
+export interface UserPreferences {
+  genres: string[];
+  mood: string | null;
+}
