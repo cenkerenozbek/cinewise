@@ -125,6 +125,9 @@ async def client(test_db):
     app.state.tfidf_vectorizer = None
     app.state.tmdb_ids = []
     app.state.top_indices = None
+    # CF artifacts — disabled by default (Plan 03-03 will produce these)
+    app.state.cf_top_indices = None
+    app.state.cf_tmdb_ids = []
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
@@ -213,6 +216,9 @@ async def client_with_nlp(test_db):
     app.state.tfidf_vectorizer = None
     app.state.tmdb_ids = tmdb_ids
     app.state.top_indices = top_indices
+    # CF artifacts — disabled by default (Plan 03-03 will produce these)
+    app.state.cf_top_indices = None
+    app.state.cf_tmdb_ids = []
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

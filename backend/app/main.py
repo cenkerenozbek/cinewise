@@ -6,9 +6,14 @@ import joblib
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import AsyncMongoClient
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from app.core.config import settings
+from app.core.limiter import limiter
 from app.api.routes.auth import router as auth_router
+from app.api.routes.feedback import router as feedback_router
 from app.api.routes.movies import router as movies_router
 from app.api.routes.recommendations import router as recommendations_router
 
@@ -25,6 +30,9 @@ async def lifespan(app: FastAPI):
     await app.state.db.movies.create_index([("title", "text")])
     # Create compound index on movies.genres + movies.year for filter queries
     await app.state.db.movies.create_index([("genres", 1), ("year", 1)])
+    # Create indexes for the interactions collection
+    await app.state.db.interactions.create_index([("user_id", 1), ("movie_id", 1)], unique=True)
+    await app.state.db.interactions.create_index([("user_id", 1)])
 
     # Load NLP artifacts for recommendation engine
     artifacts_dir = os.environ.get("ARTIFACTS_DIR", "/artifacts")
@@ -42,6 +50,18 @@ async def lifespan(app: FastAPI):
         app.state.top_indices = None
         logger.warning("NLP artifacts not found — recommendations unavailable until worker runs")
 
+    # Load CF artifacts for hybrid blending (Plan 03-03 will produce this file)
+    cf_index_path = os.path.join(artifacts_dir, "cf_index.joblib")
+    if os.path.exists(cf_index_path):
+        cf_data = joblib.load(cf_index_path)
+        app.state.cf_top_indices = cf_data["cf_top_indices"]
+        app.state.cf_tmdb_ids = cf_data["tmdb_ids"]
+        logger.info("CF artifact loaded at startup")
+    else:
+        app.state.cf_top_indices = None
+        app.state.cf_tmdb_ids = []
+        logger.info("CF artifact not found — hybrid blending disabled")
+
     yield
 
     # Shutdown: close MongoDB connection
@@ -54,6 +74,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Rate limiting — must be configured before adding SlowAPIMiddleware
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://localhost:3000"],
@@ -64,6 +89,7 @@ app.add_middleware(
 
 # Routers
 app.include_router(auth_router)
+app.include_router(feedback_router)
 app.include_router(movies_router)
 app.include_router(recommendations_router)
 

@@ -4,9 +4,10 @@ Endpoints:
 - POST /api/recommendations — Get personalized movie recommendations
 - GET  /api/recommendations/preferences — Get saved user preferences
 """
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.core.security import get_current_user
 from app.models.recommendation import PreferenceRequest, RecommendationResponse
 from app.services.recommendation_service import RecommendationService
@@ -34,7 +35,10 @@ async def _get_optional_user(request: Request) -> str | None:
 
 
 @router.post("", response_model=RecommendationResponse)
+@limiter.limit("10/minute")
 async def get_recommendations(
+    request: Request,
+    response: Response,
     body: PreferenceRequest,
     service: RecommendationService = Depends(_get_recommendation_service),
     user_id: str | None = Depends(_get_optional_user),
