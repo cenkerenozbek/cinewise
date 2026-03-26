@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-03-26T08:06:38.457Z"
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-03-26T08:06:51.000Z"
 progress:
   total_phases: 4
   completed_phases: 3
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
 ---
 
 # Project State
@@ -24,7 +24,7 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 04 (evaluation-and-demo-preparation) — EXECUTING
-Plan: 1 of 3
+Plan: 2 of 3
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Plan: 1 of 3
 | Phase 03 P03 | 2 min | 1 tasks | 4 files |
 | Phase 03 P04 | 5 | 2 tasks | 3 files |
 | Phase 04 P01 | 2 | 2 tasks | 6 files |
+| Phase 04 P02 | 3 min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,10 @@ Recent decisions affecting current work:
 - [Phase 04-01]: Genre fallback uses early-return in recommendation_service before scoring pipeline — substituting genre_docs caused empty results when all fallback movies are mutually excluded seeds
 - [Phase 04-01]: metrics.json loaded in lifespan after CF artifact block; app.state.metrics = None when absent so GET /api/metrics returns 404 cleanly
 - [Phase 04-01]: conftest.py client fixture initializes app.state.metrics = None to prevent AttributeError in unrelated tests
+- [Phase 04-02]: EvalState adapter mimics FastAPI app.state for offline RecommendationService usage — simpler than monkeypatching lifespan state
+- [Phase 04-02]: sklearn ndcg_score with shape (1, k) binary relevance arrays — reuses existing scikit-learn dependency instead of custom log2 implementation
+- [Phase 04-02]: seed_user_ namespace exclusively for eval population — real users excluded to avoid contaminating offline metrics
+- [Phase 04-02]: reset_demo fallback to top-6 rated movies when fewer than 5 canonical TMDB IDs exist in DB — idempotent on minimal datasets
 
 ### Pending Todos
 
