@@ -217,7 +217,7 @@ async def main() -> None:
         f"Seeded {total_inserted} interactions for {unique_users} users across {unique_movies} movies"
     )
 
-    client.close()
+    await client.aclose()
 
 
 if __name__ == "__main__":
