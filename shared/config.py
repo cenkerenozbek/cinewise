@@ -2,3 +2,4 @@
 
 MOVIES_COLLECTION = "movies"
 USERS_COLLECTION = "users"
+USER_PREFERENCES_COLLECTION = "user_preferences"

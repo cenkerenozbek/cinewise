@@ -17,6 +17,7 @@ services:
     volumes:
       - ./backend:/app
       - ./shared:/app/shared
+      - nlp_artifacts:/artifacts
     restart: unless-stopped
 
   frontend:
@@ -37,7 +38,9 @@ services:
     volumes:
       - ./worker:/app
       - ./shared:/app/shared
+      - nlp_artifacts:/artifacts
     restart: unless-stopped
 
 volumes:
   mongo_data:
+  nlp_artifacts:
