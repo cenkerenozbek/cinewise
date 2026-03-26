@@ -1,8 +1,9 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuthContext } from '../features/auth/AuthContext';
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuthContext();
+  const location = useLocation();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-900 text-white px-6 py-3 flex items-center justify-between shadow-lg">
@@ -12,6 +13,16 @@ export function Navbar() {
       <div className="flex items-center gap-4">
         {isAuthenticated && user ? (
           <>
+            <Link
+              to="/recommendations"
+              className={`text-sm transition-colors ${
+                location.pathname === '/recommendations'
+                  ? 'text-blue-400'
+                  : 'hover:text-blue-400'
+              }`}
+            >
+              For You
+            </Link>
             <span className="text-sm text-gray-300 hidden sm:block">{user.email}</span>
             <button
               onClick={logout}

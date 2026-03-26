@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { HomePage } from './pages/HomePage';
 import { MovieDetailPage } from './pages/MovieDetailPage';
+import { RecommendationsPage } from './pages/RecommendationsPage';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/movie/:tmdbId" element={<MovieDetailPage />} />
+          <Route path="/recommendations" element={<RecommendationsPage />} />
         </Routes>
       </main>
     </AuthProvider>
