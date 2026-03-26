@@ -5,6 +5,23 @@ import httpx
 
 
 @pytest.fixture
+def sample_movie_docs():
+    """10 sample movie documents mimicking MongoDB movie shape."""
+    return [
+        {"tmdb_id": 100, "overview": "A thrilling action movie with explosions.", "genres": ["Action", "Thriller"]},
+        {"tmdb_id": 101, "overview": "A romantic comedy about two strangers.", "genres": ["Romance", "Comedy"]},
+        {"tmdb_id": 102, "overview": "A dark mystery in a small town.", "genres": ["Mystery", "Drama"]},
+        {"tmdb_id": 103, "overview": "An animated adventure for all ages.", "genres": ["Animation", "Adventure"]},
+        {"tmdb_id": 104, "overview": "A sci-fi epic set in the future.", "genres": ["Science Fiction", "Action"]},
+        {"tmdb_id": 105, "overview": "A horror film about a haunted house.", "genres": ["Horror", "Thriller"]},
+        {"tmdb_id": 106, "overview": "A documentary about ocean life.", "genres": ["Documentary"]},
+        {"tmdb_id": 107, "overview": "A war drama set in World War II.", "genres": ["War", "Drama"]},
+        {"tmdb_id": 108, "overview": None, "genres": ["Drama"]},
+        {"tmdb_id": 109, "overview": "A comedy &amp; family <br>fun movie.", "genres": ["Comedy", "Family"]},
+    ]
+
+
+@pytest.fixture
 def sample_tmdb_response():
     """Complete TMDB movie detail response dict (with credits, translations including Turkish)."""
     return {
