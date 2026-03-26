@@ -19,22 +19,22 @@ Users get accurate, context-aware movie recommendations with transparency ("reco
 - [x] Offline batch processing (data ingestion) *(Validated in Phase 01)*
 - [x] Graceful error handling for external API failures *(Validated in Phase 01)*
 
+### Validated
+
+- [x] NLP preprocessing and TF-IDF feature extraction (5000-feature vocab, bigrams) *(Validated in Phase 02)*
+- [x] Content-based recommendation using cosine similarity (top-50 index, 7889 movies) *(Validated in Phase 02)*
+- [x] Preference input (genre, mood) for cold-start users *(Validated in Phase 02)*
+- [x] Recommendation display with poster, summary, and explanation *(Validated in Phase 02)*
+- [x] REST API endpoint for recommendations (POST /api/recommendations) *(Validated in Phase 02)*
+- [x] Offline batch NLP pipeline (worker job, joblib artifacts) *(Validated in Phase 02)*
+- [x] API response time < 3 seconds for recommendations *(Validated in Phase 02)*
+
 ### Active
 
-- [ ] NLP preprocessing and TF-IDF/embedding feature extraction
-- [ ] NLP preprocessing and TF-IDF/embedding feature extraction
-- [ ] Content-based recommendation using cosine similarity
 - [ ] Collaborative filtering signal from user interactions
 - [ ] Hybrid scoring with cold-start fallback
-- [ ] User registration/login with secure password hashing
-- [ ] Preference input (genre, mood) for cold-start users
-- [ ] Movie search and filtering (title, genre, year)
-- [ ] Recommendation display with poster, summary, and explanation
 - [ ] Like/dislike feedback controls
-- [ ] REST API endpoints (auth, search, recommendations, feedback)
-- [ ] Offline batch processing (data ingestion + NLP features)
-- [ ] Graceful error handling for external API failures
-- [ ] API response time < 3 seconds (p95) for recommendations
+- [ ] REST API endpoints (feedback)
 - [ ] Support 10 concurrent users
 - [ ] Rate limiting (10 req/min/user)
 
@@ -88,4 +88,4 @@ Users get accurate, context-aware movie recommendations with transparency ("reco
 
 Phase 01 complete — full monorepo running locally. MongoDB has ~4,300 movies from TMDB. JWT auth, movie browse/search/detail UI all working. Ready for Phase 02 (NLP + content-based recommendations).
 
-*Last updated: 2026-03-25 after Phase 01 completion*
+*Last updated: 2026-03-26
