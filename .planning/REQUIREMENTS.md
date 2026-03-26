@@ -11,7 +11,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **DATA-01**: System collects movie metadata from TMDB API (title, year, genres, cast, director, summary, poster URL, rating, vote count)
 - [x] **DATA-02**: System stores original and Turkish titles when available
-- [ ] **DATA-03**: System stores user interactions (like/dislike and/or rating per movie)
+- [x] **DATA-03**: System stores user interactions (like/dislike and/or rating per movie)
 - [x] **DATA-04**: System handles missing metadata fields without breaking recommendations
 - [x] **DATA-05**: System runs offline batch pipeline for data ingestion and NLP feature generation
 - [x] **DATA-06**: Batch pipeline completes within 2 hours for target dataset size
@@ -43,17 +43,17 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **API-01**: System exposes REST endpoints for movie listing/search/filtering
 - [x] **API-02**: System exposes REST endpoint for recommendation retrieval
-- [ ] **API-03**: System exposes REST endpoint for user feedback submission
+- [x] **API-03**: System exposes REST endpoint for user feedback submission
 - [x] **API-04**: System integrates with TMDB API with retry/backoff error handling
 - [x] **API-05**: Recommendation API responds within 3 seconds (p95)
 - [x] **API-06**: Search API responds within 2 seconds (p95)
-- [ ] **API-07**: System supports at least 10 concurrent users
+- [x] **API-07**: System supports at least 10 concurrent users
 
 ### Security & Persistence
 
 - [x] **SEC-01**: System persists users, movies, and interactions in MongoDB
 - [x] **SEC-02**: System stores passwords using bcrypt hashing
-- [ ] **SEC-03**: System applies rate limiting (10 requests/minute/user) on recommendation endpoints
+- [x] **SEC-03**: System applies rate limiting (10 requests/minute/user) on recommendation endpoints
 
 ## v2 Requirements
 
@@ -99,7 +99,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 1 | Complete |
-| DATA-03 | Phase 3 | Pending |
+| DATA-03 | Phase 3 | Complete |
 | DATA-04 | Phase 1 | Complete |
 | DATA-05 | Phase 1 | Complete (01-01) |
 | DATA-06 | Phase 1 | Complete |
@@ -119,14 +119,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-05 | Phase 3 | Pending |
 | API-01 | Phase 1 | Complete |
 | API-02 | Phase 2 | Complete |
-| API-03 | Phase 3 | Pending |
+| API-03 | Phase 3 | Complete |
 | API-04 | Phase 1 | Complete |
 | API-05 | Phase 2 | Complete |
 | API-06 | Phase 1 | Complete |
-| API-07 | Phase 3 | Pending |
+| API-07 | Phase 3 | Complete |
 | SEC-01 | Phase 1 | Complete (01-01) |
 | SEC-02 | Phase 1 | Complete |
-| SEC-03 | Phase 3 | Pending |
+| SEC-03 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 30 total
