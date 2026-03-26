@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Phase 4 context gathered
-last_updated: "2026-03-26T06:57:59.281Z"
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-03-26T08:06:38.457Z"
 progress:
   total_phases: 4
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 15
+  completed_plans: 13
 ---
 
 # Project State
@@ -19,12 +19,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users get accurate, context-aware movie recommendations with transparency ("recommended because...") even on their very first visit
-**Current focus:** Phase 03 — collaborative-filtering-and-hybrid-engine
+**Current focus:** Phase 04 — evaluation-and-demo-preparation
 
 ## Current Position
 
-Phase: 03 (collaborative-filtering-and-hybrid-engine) — EXECUTING
-Plan: 2 of 4
+Phase: 04 (evaluation-and-demo-preparation) — EXECUTING
+Plan: 1 of 3
 
 ## Performance Metrics
 
@@ -57,6 +57,7 @@ Plan: 2 of 4
 | Phase 03 P02 | 3 | 2 tasks | 3 files |
 | Phase 03 P03 | 2 min | 1 tasks | 4 files |
 | Phase 03 P04 | 5 | 2 tasks | 3 files |
+| Phase 04 P01 | 2 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ Recent decisions affecting current work:
 - [Phase 03]: _norm() returns 0.5 for all items when max==min to prevent divide-by-zero in hybrid blending
 - [Phase 03-04]: Optimistic vote state stored in local Map<tmdbId, FeedbackAction> — visual feedback is instant without waiting for the server; mutation error reverts the state
 - [Phase 03-04]: 429 detection inline in isError block via recsError.response?.status check — no new component needed
+- [Phase 04-01]: Genre fallback uses early-return in recommendation_service before scoring pipeline — substituting genre_docs caused empty results when all fallback movies are mutually excluded seeds
+- [Phase 04-01]: metrics.json loaded in lifespan after CF artifact block; app.state.metrics = None when absent so GET /api/metrics returns 404 cleanly
+- [Phase 04-01]: conftest.py client fixture initializes app.state.metrics = None to prevent AttributeError in unrelated tests
 
 ### Pending Todos
 
@@ -116,6 +120,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T06:57:59.277Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-evaluation-and-demo-preparation/04-CONTEXT.md
+Last session: 2026-03-26T08:06:38.454Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None
