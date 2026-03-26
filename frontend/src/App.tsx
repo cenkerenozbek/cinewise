@@ -1,11 +1,16 @@
-import { Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './features/auth/AuthContext';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuthContext } from './features/auth/AuthContext';
 import { Navbar } from './components/Navbar';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { HomePage } from './pages/HomePage';
 import { MovieDetailPage } from './pages/MovieDetailPage';
 import { RecommendationsPage } from './pages/RecommendationsPage';
+
+function PrivateRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuthContext();
+  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+}
 
 function App() {
   return (
@@ -17,7 +22,10 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/movie/:tmdbId" element={<MovieDetailPage />} />
-          <Route path="/recommendations" element={<RecommendationsPage />} />
+          <Route
+            path="/recommendations"
+            element={<PrivateRoute><RecommendationsPage /></PrivateRoute>}
+          />
         </Routes>
       </main>
     </AuthProvider>

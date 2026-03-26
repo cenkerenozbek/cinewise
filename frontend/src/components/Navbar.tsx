@@ -1,9 +1,15 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../features/auth/AuthContext';
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuthContext();
   const location = useLocation();
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    logout();
+    navigate('/');
+  }
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-900 text-white px-6 py-3 flex items-center justify-between shadow-lg">
@@ -25,7 +31,7 @@ export function Navbar() {
             </Link>
             <span className="text-sm text-gray-300 hidden sm:block">{user.email}</span>
             <button
-              onClick={logout}
+              onClick={handleLogout}
               className="px-3 py-1.5 text-sm bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             >
               Logout
