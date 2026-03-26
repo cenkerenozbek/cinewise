@@ -84,6 +84,29 @@ class RecommendationService:
         )
         genre_docs = await cursor.to_list(length=None)
 
+        # Cold-start fallback: if no genre-matching movies found, return top-rated directly
+        if not genre_docs:
+            logger.warning("No movies match selected genres %s — falling back to top-rated", genres)
+            fallback_cursor = self._db.movies.find(
+                {"rating": {"$ne": None}},
+            ).sort("rating", -1).limit(TOP_K)
+            fallback_docs = await fallback_cursor.to_list(length=None)
+            explanation = build_explanation(genres, mood)
+            recommendations = []
+            for d in fallback_docs:
+                recommendations.append(RecommendationItem(
+                    tmdb_id=d["tmdb_id"],
+                    title=d.get("title", ""),
+                    title_tr=d.get("title_tr"),
+                    year=d.get("year"),
+                    genres=d.get("genres", []),
+                    poster_path=d.get("poster_path"),
+                    rating=d.get("rating"),
+                    overview=d.get("overview"),
+                    explanation=explanation,
+                ))
+            return RecommendationResponse(recommendations=recommendations)
+
         # Score candidates by frequency in neighbors of genre-matching seeds
         candidate_scores: dict[int, float] = {}
         seed_tmdb_ids = set()

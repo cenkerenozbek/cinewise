@@ -223,3 +223,57 @@ async def test_no_cf_artifact_falls_back(client_with_nlp, seed_movies, test_db):
     )
     assert resp.status_code == 200
     assert len(resp.json()["recommendations"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 Plan 01 — Cold-start edge case tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_genre_fallback_returns_results(client_with_nlp, seed_movies):
+    """Genre with zero DB matches falls back to top-rated movies — non-empty result."""
+    from app.main import app
+    db = app.state.db
+    state = app.state
+
+    service = RecommendationService(db, state)
+    # "Western" genre has no matching movies in seed_movies (100-119)
+    result = await service.get_recommendations(["Western"], None, user_id=None)
+    assert len(result.recommendations) > 0
+
+
+@pytest.mark.asyncio
+async def test_obscure_movie_no_cf_neighbors(client_with_hybrid, seed_movies, test_db):
+    """Hybrid mode returns results even when a movie's CF neighbors are all excluded seeds."""
+    from app.main import app
+    from app.core.security import create_access_token
+    import numpy as np
+
+    db = app.state.db
+    state = app.state
+
+    # Seed 5 interactions for testuser3 on movies 100-104 (Action genre)
+    for i in range(5):
+        await test_db.interactions.update_one(
+            {"user_id": "testuser3", "movie_id": 100 + i},
+            {"$set": {"user_id": "testuser3", "movie_id": 100 + i, "action": "like"}},
+            upsert=True,
+        )
+
+    # Set CF neighbors for movies 100-104 to point only to each other (all seeds, thus excluded)
+    tmdb_ids = list(state.cf_tmdb_ids)
+    cf_top_indices = np.array(state.cf_top_indices, copy=True)
+    for i in range(5):
+        # Neighbors: only the other 4 seed movie indices (0-4)
+        neighbors = [(i + j + 1) % 5 for j in range(50)]
+        cf_top_indices[i] = neighbors
+    state.cf_top_indices = cf_top_indices
+
+    token = create_access_token("testuser3")
+    resp = await client_with_hybrid.post(
+        "/api/recommendations",
+        json={"genres": ["Action"]},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert resp.status_code == 200
+    assert len(resp.json()["recommendations"]) > 0
