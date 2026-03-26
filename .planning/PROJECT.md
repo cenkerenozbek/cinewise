@@ -86,6 +86,6 @@ Users get accurate, context-aware movie recommendations with transparency ("reco
 ---
 ## Current State
 
-Phase 01 complete — full monorepo running locally. MongoDB has ~4,300 movies from TMDB. JWT auth, movie browse/search/detail UI all working. Ready for Phase 02 (NLP + content-based recommendations).
+Phase 02 complete — content-based recommendation engine live. NLP pipeline processes 7,889 movies (TF-IDF, top-50 similarity index). POST /api/recommendations returns top-10 with explanations in < 3s. Genre/mood preference chips, recommendations page, and auth-gated "For You" navbar link all working. Ready for Phase 03 (collaborative filtering + hybrid engine).
 
 *Last updated: 2026-03-26
