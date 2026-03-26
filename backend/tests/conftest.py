@@ -144,3 +144,78 @@ async def mock_nlp_state():
         neighbors = [(i + j + 1) % 10 for j in range(50)]
         top_indices[i] = neighbors
     return {"tmdb_ids": tmdb_ids, "top_indices": top_indices}
+
+
+# 20 sample movies covering a range of genres; tmdb_ids 100-119
+_SEED_MOVIE_DATA = [
+    {"tmdb_id": 100, "title": "Action Hero", "genres": ["Action"], "year": 2020, "rating": 7.5},
+    {"tmdb_id": 101, "title": "Action Sequel", "genres": ["Action", "Thriller"], "year": 2021, "rating": 7.2},
+    {"tmdb_id": 102, "title": "Rom-Com Classic", "genres": ["Romance", "Comedy"], "year": 2019, "rating": 6.8},
+    {"tmdb_id": 103, "title": "Thriller Night", "genres": ["Thriller", "Horror"], "year": 2022, "rating": 7.0},
+    {"tmdb_id": 104, "title": "Comedy Nights", "genres": ["Comedy"], "year": 2020, "rating": 6.5},
+    {"tmdb_id": 105, "title": "Drama Queens", "genres": ["Drama", "Romance"], "year": 2018, "rating": 7.8},
+    {"tmdb_id": 106, "title": "Sci-Fi Future", "genres": ["Science Fiction"], "year": 2023, "rating": 8.0},
+    {"tmdb_id": 107, "title": "Horror Mansion", "genres": ["Horror"], "year": 2021, "rating": 6.3},
+    {"tmdb_id": 108, "title": "Animated Dreams", "genres": ["Animation", "Comedy"], "year": 2022, "rating": 7.9},
+    {"tmdb_id": 109, "title": "Doc Earth", "genres": ["Documentary"], "year": 2020, "rating": 8.2},
+    {"tmdb_id": 110, "title": "Action Storm", "genres": ["Action"], "year": 2019, "rating": 7.1},
+    {"tmdb_id": 111, "title": "Mystery Mind", "genres": ["Mystery", "Thriller"], "year": 2021, "rating": 7.4},
+    {"tmdb_id": 112, "title": "Love Story", "genres": ["Romance"], "year": 2017, "rating": 6.9},
+    {"tmdb_id": 113, "title": "Comedy Hour", "genres": ["Comedy", "Animation"], "year": 2023, "rating": 7.0},
+    {"tmdb_id": 114, "title": "Dark Drama", "genres": ["Drama"], "year": 2016, "rating": 7.6},
+    {"tmdb_id": 115, "title": "Space Odyssey", "genres": ["Science Fiction", "Adventure"], "year": 2024, "rating": 8.1},
+    {"tmdb_id": 116, "title": "Nature Doc", "genres": ["Documentary"], "year": 2021, "rating": 8.3},
+    {"tmdb_id": 117, "title": "Action Blitz", "genres": ["Action", "Adventure"], "year": 2022, "rating": 7.3},
+    {"tmdb_id": 118, "title": "Crime Thriller", "genres": ["Thriller", "Crime"], "year": 2020, "rating": 7.7},
+    {"tmdb_id": 119, "title": "Romantic Drama", "genres": ["Romance", "Drama"], "year": 2019, "rating": 7.0},
+]
+
+
+@pytest_asyncio.fixture
+async def seed_movies(test_db):
+    """Insert 20 sample movie documents into test_db with various genres (tmdb_ids 100-119).
+
+    Uses copies of the data dicts to avoid _id mutation across test runs.
+    """
+    docs = [dict(m) for m in _SEED_MOVIE_DATA]
+    await test_db.movies.insert_many(docs)
+    yield docs
+    await test_db.movies.delete_many({"tmdb_id": {"$in": [m["tmdb_id"] for m in _SEED_MOVIE_DATA]}})
+
+
+@pytest_asyncio.fixture
+async def client_with_nlp(test_db):
+    """HTTP client with DB override AND mock NLP state on app.state.
+
+    tmdb_ids covers all 20 seed movies (100-119).
+    top_indices shape (20, 50): each movie's neighbors spread across all others.
+
+    NOTE: does NOT insert seed movies — use the `seed_movies` fixture alongside this
+    one when tests require actual movie documents in the database.
+    """
+    from app.main import app
+    from app.core.database import get_db
+
+    # Build realistic NLP state covering 20 seed movies
+    tmdb_ids = list(range(100, 120))  # 20 movies
+    n = len(tmdb_ids)
+    top_indices = np.zeros((n, 50), dtype=np.int32)
+    for i in range(n):
+        # Neighbors: next 50 indices wrapping around (modular), skipping self
+        neighbors = [(i + j + 1) % n for j in range(50)]
+        top_indices[i] = neighbors
+
+    async def override_get_db(request: Request):
+        return test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.state.db = test_db
+    app.state.tfidf_vectorizer = None
+    app.state.tmdb_ids = tmdb_ids
+    app.state.top_indices = top_indices
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
