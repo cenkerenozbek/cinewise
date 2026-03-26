@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-03-26T06:03:00Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-03-26T06:08:05.457Z"
 progress:
   total_phases: 4
   completed_phases: 2
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
 ---
 
 # Project State
@@ -55,6 +55,7 @@ Plan: 2 of 4
 | Phase 02 P04 | 2 | 2 tasks | 5 files |
 | Phase 03 P01 | 4 | 1 tasks | 11 files |
 | Phase 03 P02 | 3 | 2 tasks | 3 files |
+| Phase 03 P03 | 2 min | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Recent decisions affecting current work:
 - [Phase 03-02]: scipy.sparse.csr_matrix for user-item matrix — memory-safe for sparse interaction data; avoids dense N_users x N_movies allocation
 - [Phase 03-02]: Canonical tmdb_ids sourced from similarity_index.joblib in cf_features main — ensures CF and NLP artifacts are aligned
 - [Phase 03-02]: int(float(tmdb_raw)) in links.csv parsing — MovieLens ships tmdbId as float-formatted strings ("12345.0")
+- [Phase 03]: Step-function alpha: 1.0 for <5 interactions, 0.5 blend at/above threshold — configurable via CF_THRESHOLD and CF_ALPHA env vars
+- [Phase 03]: _norm() returns 0.5 for all items when max==min to prevent divide-by-zero in hybrid blending
 
 ### Pending Todos
 
@@ -110,6 +113,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-26T06:03:00Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-03-26T06:08:05.454Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None

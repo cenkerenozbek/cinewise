@@ -28,7 +28,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **REC-01**: System generates Top-K personalized movie recommendations
 - [x] **REC-02**: System implements content-based recommendation using cosine similarity on TF-IDF
 - [x] **REC-03**: System implements collaborative filtering signal from user interactions
-- [ ] **REC-04**: System combines content-based and collaborative signals using hybrid weighted scoring
+- [x] **REC-04**: System combines content-based and collaborative signals using hybrid weighted scoring
 - [x] **REC-05**: System handles cold-start users by relying on content-based + explicit preferences
 
 ### User Interface
@@ -110,7 +110,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | REC-01 | Phase 2 | Complete |
 | REC-02 | Phase 2 | Complete |
 | REC-03 | Phase 3 | Complete |
-| REC-04 | Phase 3 | Pending |
+| REC-04 | Phase 3 | Complete |
 | REC-05 | Phase 2 | Complete |
 | UI-01 | Phase 1 | Complete |
 | UI-02 | Phase 2 | Complete |
