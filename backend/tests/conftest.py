@@ -137,6 +137,45 @@ async def client(test_db):
 
 
 @pytest_asyncio.fixture
+async def client_with_hybrid(test_db):
+    """HTTP client with NLP + CF artifacts on app.state.
+
+    CF neighbors are set to reverse order relative to NLP neighbors so that
+    hybrid blending produces rankings different from pure content-based.
+    """
+    from app.main import app
+    from app.core.database import get_db
+
+    tmdb_ids = list(range(100, 120))
+    n = len(tmdb_ids)
+    top_indices = np.zeros((n, 50), dtype=np.int32)
+    cf_top_indices = np.zeros((n, 50), dtype=np.int32)
+    for i in range(n):
+        neighbors = [(i + j + 1) % n for j in range(50)]
+        top_indices[i] = neighbors
+        # CF neighbors: reverse order to create different ranking
+        cf_neighbors = [(i + n - j - 1) % n for j in range(50)]
+        cf_top_indices[i] = cf_neighbors
+
+    async def override_get_db(request: Request):
+        return test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.state.db = test_db
+    app.state.tfidf_vectorizer = None
+    app.state.tmdb_ids = tmdb_ids
+    app.state.top_indices = top_indices
+    app.state.cf_top_indices = cf_top_indices
+    app.state.cf_tmdb_ids = tmdb_ids
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
 async def mock_nlp_state():
     """Create mock NLP artifacts for recommendation tests."""
     # 10 fake movies with tmdb_ids
