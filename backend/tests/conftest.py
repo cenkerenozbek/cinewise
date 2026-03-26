@@ -7,6 +7,7 @@ get_db dependency so no real MongoDB connection is needed.
 import pytest
 import pytest_asyncio
 import mongomock
+import numpy as np
 from httpx import AsyncClient, ASGITransport
 from fastapi import Request
 
@@ -120,8 +121,26 @@ async def client(test_db):
     # Also patch the app state so lifespan-created indexes don't fail
     app.state.db = test_db
 
+    # Set NLP artifacts to None by default (tests that need them will override)
+    app.state.tfidf_vectorizer = None
+    app.state.tmdb_ids = []
+    app.state.top_indices = None
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()
+
+
+@pytest_asyncio.fixture
+async def mock_nlp_state():
+    """Create mock NLP artifacts for recommendation tests."""
+    # 10 fake movies with tmdb_ids
+    tmdb_ids = list(range(100, 110))
+    # Each movie's top-50 neighbors (use modular indices for 10 movies)
+    top_indices = np.zeros((10, 50), dtype=np.int32)
+    for i in range(10):
+        neighbors = [(i + j + 1) % 10 for j in range(50)]
+        top_indices[i] = neighbors
+    return {"tmdb_ids": tmdb_ids, "top_indices": top_indices}
