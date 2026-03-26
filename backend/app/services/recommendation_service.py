@@ -2,10 +2,33 @@
 import logging
 from fastapi import HTTPException
 
+from app.core.config import settings
 from app.models.recommendation import RecommendationItem, RecommendationResponse
+from app.repositories.interactions_repo import InteractionsRepository
 from app.repositories.user_preferences_repo import UserPreferencesRepository
 
 logger = logging.getLogger(__name__)
+
+
+def _norm(scores: dict) -> dict:
+    """Min-max normalize a score dict to [0, 1].
+
+    Edge case: if max == min (all scores identical), return 0.5 for all.
+    """
+    if not scores:
+        return scores
+    min_s = min(scores.values())
+    max_s = max(scores.values())
+    if max_s == min_s:
+        return {k: 0.5 for k in scores}
+    return {k: (v - min_s) / (max_s - min_s) for k, v in scores.items()}
+
+
+def _get_alpha(interaction_count: int, threshold: int, cf_alpha: float) -> float:
+    """Step function: pure content below threshold, blend at/above threshold."""
+    if interaction_count >= threshold:
+        return cf_alpha
+    return 1.0
 
 MOOD_GENRE_MAP = {
     "Tense": ["Thriller", "Horror"],
@@ -90,6 +113,45 @@ class RecommendationService:
                 for cdoc in cand_docs:
                     if set(cdoc.get("genres", [])) & boost_genres:
                         candidate_scores[cdoc["tmdb_id"]] *= MOOD_BOOST
+
+        # --- Hybrid blending (Phase 3) ---
+        # Determine alpha based on user's interaction count
+        alpha = 1.0  # default: pure content
+        if user_id and self._state.cf_top_indices is not None:
+            interactions_repo = InteractionsRepository(self._db)
+            interaction_count = await interactions_repo.count_by_user_id(user_id)
+            alpha = _get_alpha(interaction_count, settings.CF_THRESHOLD, settings.CF_ALPHA)
+
+        if alpha < 1.0 and self._state.cf_top_indices is not None:
+            # Build CF scores for candidates
+            cf_tmdb_ids = self._state.cf_tmdb_ids
+            cf_top_indices = self._state.cf_top_indices
+            cf_id_to_idx = {tid: i for i, tid in enumerate(cf_tmdb_ids)}
+
+            # Get user's liked movies from interactions
+            user_interactions = await interactions_repo.get_by_user_id(user_id)
+            liked_movie_ids = [ia["movie_id"] for ia in user_interactions if ia["action"] == "like"]
+
+            # Score candidates by CF: how often they appear as CF neighbors of liked movies
+            cf_scores: dict = {}
+            for liked_id in liked_movie_ids:
+                liked_idx = cf_id_to_idx.get(liked_id)
+                if liked_idx is None:
+                    continue
+                for neighbor_idx in cf_top_indices[liked_idx]:
+                    neighbor_id = cf_tmdb_ids[int(neighbor_idx)]
+                    if neighbor_id in candidate_scores:  # only score existing candidates
+                        cf_scores[neighbor_id] = cf_scores.get(neighbor_id, 0.0) + 1.0
+
+            # Normalize and blend
+            if cf_scores:
+                norm_content = _norm(candidate_scores)
+                norm_cf = _norm(cf_scores)
+                for tid in candidate_scores:
+                    content_val = norm_content.get(tid, 0.0)
+                    cf_val = norm_cf.get(tid, 0.0)
+                    candidate_scores[tid] = alpha * content_val + (1.0 - alpha) * cf_val
+        # --- End hybrid blending ---
 
         # Rank and take top-K
         top_ids = sorted(candidate_scores, key=lambda k: candidate_scores[k], reverse=True)[:TOP_K]
