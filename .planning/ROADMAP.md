@@ -47,7 +47,7 @@ Plans:
   3. Two new users with different genre preferences receive meaningfully different recommendation lists (cold-start is not a single static list)
   4. The NLP batch pipeline preprocesses movie summaries, builds TF-IDF vectors, and writes a precomputed top-50 similarity index to disk without running out of memory
   5. The recommendation API loads precomputed artifacts at startup and serves responses within 3 seconds (p95) without recomputing NLP on each request
-**Plans:** 1/4 plans executed
+**Plans:** 2/4 plans executed
 
 Plans:
 - [ ] 02-01-PLAN.md — Infrastructure: NLP dependencies, shared volume, type contracts, test scaffolds
@@ -85,6 +85,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation and Data Pipeline | 4/4 | Complete | 2026-03-25 |
-| 2. Content-Based Recommendation Engine | 1/4 | In Progress|  |
+| 2. Content-Based Recommendation Engine | 2/4 | In Progress|  |
 | 3. Collaborative Filtering and Hybrid Engine | 0/TBD | Not started | - |
 | 4. Evaluation and Demo Preparation | 0/TBD | Not started | - |
