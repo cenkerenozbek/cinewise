@@ -64,7 +64,13 @@ Plans:
   2. A returning user with 5 or more interactions receives recommendations that differ from what a new user with the same genre preferences would see, demonstrating collaborative signal influence
   3. The hybrid blending weight shifts automatically from pure content-based (alpha=1.0) toward collaborative signal as a user accumulates interactions, with a configurable threshold
   4. The system rejects requests exceeding 10 per minute per user with a rate-limit response, and sustains correct behavior under 10 concurrent users
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Feedback API, interactions repository, rate limiting, concurrency tests
+- [ ] 03-02-PLAN.md — CF batch pipeline and MovieLens seeding script
+- [ ] 03-03-PLAN.md — Hybrid blending in recommendation service
+- [ ] 03-04-PLAN.md — Frontend like/dislike buttons and 429 handling
 
 ### Phase 4: Evaluation and Demo Preparation
 **Goal**: The system demonstrates measurable recommendation quality using standard academic metrics and handles realistic demo conditions without failure
@@ -86,5 +92,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 1. Foundation and Data Pipeline | 4/4 | Complete | 2026-03-25 |
 | 2. Content-Based Recommendation Engine | 4/4 | Complete   | 2026-03-26 |
-| 3. Collaborative Filtering and Hybrid Engine | 0/TBD | Not started | - |
+| 3. Collaborative Filtering and Hybrid Engine | 0/4 | Planned | - |
 | 4. Evaluation and Demo Preparation | 0/TBD | Not started | - |
