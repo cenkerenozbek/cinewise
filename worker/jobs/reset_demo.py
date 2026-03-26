@@ -227,7 +227,7 @@ async def main() -> None:
     await cleanup_uat_accounts(db, args.uat_prefix, dry_run=args.dry_run)
 
     print("\nDemo state reset complete. Ready for presentation.")
-    client.close()
+    await client.aclose()
 
 
 if __name__ == "__main__":

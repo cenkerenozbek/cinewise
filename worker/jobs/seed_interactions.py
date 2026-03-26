@@ -26,6 +26,7 @@ import csv
 import logging
 import os
 import sys
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 
@@ -122,6 +123,7 @@ def build_interactions(
                 ml_user_id = int(row["userId"])
                 ml_movie_id = int(row["movieId"])
                 rating = float(row["rating"])
+                ts = datetime.fromtimestamp(float(row["timestamp"]), tz=timezone.utc)
             except (ValueError, KeyError):
                 continue
 
@@ -149,6 +151,7 @@ def build_interactions(
                 "user_id": f"seed_user_{ml_user_id}",
                 "movie_id": tmdb_id,
                 "action": action,
+                "updated_at": ts,
             })
 
     logger.info(
@@ -189,7 +192,7 @@ async def main() -> None:
 
     if not interactions:
         logger.warning("No interactions to seed — check MOVIELENS_DIR and movies collection")
-        client.close()
+        await client.aclose()
         return
 
     # Step 4: Idempotent cleanup — delete all existing seed interactions

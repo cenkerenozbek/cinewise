@@ -119,10 +119,6 @@ class RecommendationService:
                 neighbor_id = tmdb_ids[int(neighbor_idx)]
                 candidate_scores[neighbor_id] = candidate_scores.get(neighbor_id, 0.0) + 1.0
 
-        # Remove seed movies from candidates (user already knows these genres)
-        for sid in seed_tmdb_ids:
-            candidate_scores.pop(sid, None)
-
         # Apply mood boost
         if mood and mood in MOOD_GENRE_MAP:
             boost_genres = set(MOOD_GENRE_MAP[mood])
@@ -140,10 +136,13 @@ class RecommendationService:
         # --- Hybrid blending (Phase 3) ---
         # Determine alpha based on user's interaction count
         alpha = 1.0  # default: pure content
-        if user_id and self._state.cf_top_indices is not None:
+        user_interactions: list = []
+        if user_id:
             interactions_repo = InteractionsRepository(self._db)
-            interaction_count = await interactions_repo.count_by_user_id(user_id)
-            alpha = _get_alpha(interaction_count, settings.CF_THRESHOLD, settings.CF_ALPHA)
+            user_interactions = await interactions_repo.get_by_user_id(user_id)
+            interaction_count = len(user_interactions)
+            if self._state.cf_top_indices is not None:
+                alpha = _get_alpha(interaction_count, settings.CF_THRESHOLD, settings.CF_ALPHA)
 
         if alpha < 1.0 and self._state.cf_top_indices is not None:
             # Build CF scores for candidates
@@ -151,8 +150,6 @@ class RecommendationService:
             cf_top_indices = self._state.cf_top_indices
             cf_id_to_idx = {tid: i for i, tid in enumerate(cf_tmdb_ids)}
 
-            # Get user's liked movies from interactions
-            user_interactions = await interactions_repo.get_by_user_id(user_id)
             liked_movie_ids = [ia["movie_id"] for ia in user_interactions if ia["action"] == "like"]
 
             # Score candidates by CF: how often they appear as CF neighbors of liked movies
@@ -175,6 +172,12 @@ class RecommendationService:
                     cf_val = norm_cf.get(tid, 0.0)
                     candidate_scores[tid] = alpha * content_val + (1.0 - alpha) * cf_val
         # --- End hybrid blending ---
+
+        # Exclude movies the user has already interacted with
+        if user_interactions:
+            seen_ids = {ia["movie_id"] for ia in user_interactions}
+            for mid in seen_ids:
+                candidate_scores.pop(mid, None)
 
         # Rank and take top-K
         top_ids = sorted(candidate_scores, key=lambda k: candidate_scores[k], reverse=True)[:TOP_K]

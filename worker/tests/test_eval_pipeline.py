@@ -3,7 +3,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from jobs.evaluate import build_leave_one_out_test_set, compute_ndcg_at_k, precision_at_k
+from jobs.evaluate import (
+    build_leave_one_out_test_set,
+    compute_ndcg_at_k,
+    precision_at_k,
+    score_from_history,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -126,6 +131,26 @@ def test_leave_one_out_split_respects_max_users():
     assert len(result) == 1
 
 
+def test_leave_one_out_split_no_timestamp_fallback():
+    """Interactions without updated_at (seeded data pre-fix) fall back to insertion order 0."""
+    # Build interactions without updated_at — simulate old seeded docs
+    interactions_no_ts = [
+        {"user_id": "user_e", "movie_id": 401, "action": "like"},
+        {"user_id": "user_e", "movie_id": 402, "action": "like"},
+        {"user_id": "user_e", "movie_id": 403, "action": "like"},
+        {"user_id": "user_e", "movie_id": 404, "action": "like"},
+        {"user_id": "user_e", "movie_id": 405, "action": "like"},
+    ]
+    # All sort keys resolve to 0, so stable sort preserves insertion order.
+    # Held-out must be movie 405 (last in list after stable sort).
+    result = build_leave_one_out_test_set(interactions_no_ts, min_likes=5, max_users=500)
+    assert len(result) == 1
+    _, held_out, training = result[0]
+    assert held_out == 405
+    assert len(training) == 4
+    assert 405 not in training
+
+
 def test_leave_one_out_split_excludes_dislikes():
     """Dislike interactions are not counted toward min_likes threshold."""
     interactions_with_dislikes = SAMPLE_INTERACTIONS + [
@@ -139,3 +164,59 @@ def test_leave_one_out_split_excludes_dislikes():
     result = build_leave_one_out_test_set(interactions_with_dislikes, min_likes=5, max_users=500)
     user_ids = {entry[0] for entry in result}
     assert "user_d" not in user_ids
+
+
+# ---------------------------------------------------------------------------
+# score_from_history tests
+# ---------------------------------------------------------------------------
+
+
+def _make_nlp_data(tmdb_ids: list[int], neighbors: dict[int, list[int]]) -> dict:
+    """Build a minimal nlp_data dict for testing.
+
+    neighbors maps tmdb_id -> list of neighbor tmdb_ids.
+    """
+    id_to_idx = {tid: i for i, tid in enumerate(tmdb_ids)}
+    top_indices = []
+    for tid in tmdb_ids:
+        neighbor_ids = neighbors.get(tid, [])
+        top_indices.append([id_to_idx[n] for n in neighbor_ids if n in id_to_idx])
+    import numpy as np
+    return {"tmdb_ids": tmdb_ids, "top_indices": np.array(top_indices, dtype=object)}
+
+
+def test_score_from_history_returns_candidates():
+    """Neighbors of training movies appear in candidate scores."""
+    # Movies 1,2 are training; their neighbors are 3,4,5
+    nlp = _make_nlp_data([1, 2, 3, 4, 5], {1: [3, 4], 2: [4, 5]})
+    scores = score_from_history([1, 2], nlp, cf_data=None)
+    assert set(scores.keys()) == {3, 4, 5}
+    assert scores[4] > scores[3]  # movie 4 is neighbor of both → higher score
+
+
+def test_score_from_history_unknown_training_ids_ignored():
+    """Training IDs not in the NLP index are silently skipped."""
+    nlp = _make_nlp_data([1, 2, 3], {1: [2, 3]})
+    scores = score_from_history([1, 999], nlp, cf_data=None)
+    assert 2 in scores and 3 in scores  # from movie 1
+    assert 999 not in scores
+
+
+def test_score_from_history_empty_training_returns_empty():
+    """Empty training list produces no candidates."""
+    nlp = _make_nlp_data([1, 2, 3], {1: [2, 3]})
+    scores = score_from_history([], nlp, cf_data=None)
+    assert scores == {}
+
+
+def test_score_from_history_history_limit_uses_last_n():
+    """Applying a history limit uses only the last N training IDs."""
+    # movie 1 → neighbors [10,11]; movie 2 → neighbors [20,21]
+    nlp = _make_nlp_data([1, 2, 10, 11, 20, 21], {1: [10, 11], 2: [20, 21]})
+    # full training [1, 2] → candidates include 10,11,20,21
+    full = score_from_history([1, 2], nlp, cf_data=None)
+    assert {10, 11, 20, 21}.issubset(full.keys())
+    # limit to last 1 → only movie 2 used → only 20,21
+    limited = score_from_history([1, 2][-1:], nlp, cf_data=None)
+    assert 20 in limited and 21 in limited
+    assert 10 not in limited and 11 not in limited

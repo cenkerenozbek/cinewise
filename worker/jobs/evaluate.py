@@ -1,11 +1,15 @@
 """Offline evaluation: Precision@10 and NDCG@10 using leave-one-out.
 
-Reads seed_user interactions from MongoDB, builds a leave-one-out test set,
-calls RecommendationService directly (no HTTP), computes metrics, and
-writes metrics.json to the artifacts directory.
+History-driven evaluation: scores candidates directly from each user's
+training interaction history using the NLP similarity index and CF index,
+without routing through the live recommendation service.
+
+This matches the proposal's intent: measure how quickly the hybrid engine
+converges to relevant recommendations given limited interaction history.
 
 Usage:
     python jobs/evaluate.py [--max-users 500] [--artifacts-dir /artifacts]
+                            [--history-limit 1|3|5]
 """
 
 import argparse
@@ -15,7 +19,6 @@ import logging
 import os
 import random
 import sys
-from collections import Counter
 from datetime import date
 
 import joblib
@@ -23,15 +26,98 @@ import numpy as np
 from dotenv import load_dotenv
 from sklearn.metrics import ndcg_score
 
-# Add project root to path so shared/ is importable and backend/ so app/ is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../backend"))
 
 from pymongo import AsyncMongoClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+# Defaults — overridden in main() after load_dotenv()
+_DEFAULT_CF_THRESHOLD = 5
+_DEFAULT_CF_ALPHA = 0.5
+
+
+def _norm(scores: dict) -> dict:
+    """Min-max normalise a score dict to [0, 1]."""
+    if not scores:
+        return scores
+    min_s = min(scores.values())
+    max_s = max(scores.values())
+    if max_s == min_s:
+        return {k: 0.5 for k in scores}
+    return {k: (v - min_s) / (max_s - min_s) for k, v in scores.items()}
+
+
+def _get_alpha(n_interactions: int, cf_threshold: int, cf_alpha: float) -> float:
+    """Return content weight alpha: 1.0 (pure content) below threshold, cf_alpha above."""
+    return cf_alpha if n_interactions >= cf_threshold else 1.0
+
+
+def score_from_history(
+    training_ids: list[int],
+    nlp_data: dict,
+    cf_data: dict | None,
+    cf_threshold: int = _DEFAULT_CF_THRESHOLD,
+    cf_alpha: float = _DEFAULT_CF_ALPHA,
+) -> dict[int, float]:
+    """Score candidate movies using NLP and CF indices from training history.
+
+    For each training movie, collects NLP neighbors (content signal) and CF
+    neighbors (collaborative signal), blends them by alpha, and returns a
+    {tmdb_id: score} dict.  Training movies themselves are NOT excluded here
+    so that the caller can choose which items to filter.
+
+    Args:
+        training_ids: TMDB IDs of movies the user liked in training split.
+        nlp_data: Loaded similarity_index.joblib dict.
+        cf_data: Loaded cf_index.joblib dict, or None for content-only mode.
+
+    Returns:
+        Dict mapping candidate tmdb_id → blended score (higher is better).
+    """
+    tmdb_ids: list[int] = nlp_data["tmdb_ids"]
+    top_indices = nlp_data["top_indices"]
+    id_to_idx = {tid: i for i, tid in enumerate(tmdb_ids)}
+
+    # Content: NLP neighbors of each training movie
+    content_scores: dict[int, float] = {}
+    for mid in training_ids:
+        idx = id_to_idx.get(mid)
+        if idx is None:
+            continue
+        for neighbor_idx in top_indices[idx]:
+            neighbor_id = tmdb_ids[int(neighbor_idx)]
+            content_scores[neighbor_id] = content_scores.get(neighbor_id, 0.0) + 1.0
+
+    if not content_scores:
+        return {}
+
+    # CF: CF neighbors of each training movie (only re-scores existing candidates)
+    cf_scores: dict[int, float] = {}
+    if cf_data is not None:
+        cf_tmdb_ids: list[int] = cf_data["tmdb_ids"]
+        cf_top_indices = cf_data["cf_top_indices"]
+        cf_id_to_idx = {tid: i for i, tid in enumerate(cf_tmdb_ids)}
+        for mid in training_ids:
+            idx = cf_id_to_idx.get(mid)
+            if idx is None:
+                continue
+            for neighbor_idx in cf_top_indices[idx]:
+                neighbor_id = cf_tmdb_ids[int(neighbor_idx)]
+                if neighbor_id in content_scores:
+                    cf_scores[neighbor_id] = cf_scores.get(neighbor_id, 0.0) + 1.0
+
+    # Blend
+    alpha = _get_alpha(len(training_ids), cf_threshold, cf_alpha) if cf_data else 1.0
+    if cf_scores and alpha < 1.0:
+        norm_content = _norm(content_scores)
+        norm_cf = _norm(cf_scores)
+        return {
+            tid: alpha * norm_content.get(tid, 0.0) + (1.0 - alpha) * norm_cf.get(tid, 0.0)
+            for tid in content_scores
+        }
+    return content_scores
 
 
 # ---------------------------------------------------------------------------
@@ -117,33 +203,17 @@ def build_leave_one_out_test_set(
     for uid, likes in user_likes.items():
         if len(likes) < min_likes:
             continue
-        # Sort ascending by updated_at so the last element is the most recent
-        sorted_likes = sorted(likes, key=lambda d: d["updated_at"])
+        # Sort ascending by updated_at (or _id as fallback for seeded data without timestamps)
+        sorted_likes = sorted(likes, key=lambda d: d.get("updated_at") or (d["_id"].generation_time if "_id" in d else 0))
         held_out_doc = sorted_likes[-1]
         training_docs = sorted_likes[:-1]
         held_out_id = held_out_doc["movie_id"]
         training_ids = [d["movie_id"] for d in training_docs]
         test_set.append((uid, held_out_id, training_ids))
 
-    # Random shuffle before capping to avoid bias toward first-seen users
-    random.shuffle(test_set)
+    # Deterministic shuffle before capping (seed=42 for reproducible capstone metrics)
+    random.Random(42).shuffle(test_set)
     return test_set[:max_users]
-
-
-# ---------------------------------------------------------------------------
-# EvalState — mimics app.state for offline RecommendationService usage
-# ---------------------------------------------------------------------------
-
-
-class EvalState:
-    """Mimics app.state attributes for offline RecommendationService usage."""
-
-    def __init__(self, nlp_data: dict, cf_data: dict | None) -> None:
-        self.tfidf_vectorizer = None
-        self.tmdb_ids = nlp_data["tmdb_ids"]
-        self.top_indices = nlp_data["top_indices"]
-        self.cf_top_indices = cf_data["cf_top_indices"] if cf_data else None
-        self.cf_tmdb_ids = cf_data["tmdb_ids"] if cf_data else []
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +226,13 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description="Offline evaluation: Precision@10 and NDCG@10")
     parser.add_argument("--max-users", type=int, default=500, help="Max test users (default 500)")
     parser.add_argument("--artifacts-dir", type=str, default=None, help="Artifacts directory")
+    parser.add_argument(
+        "--history-limit",
+        type=int,
+        default=None,
+        help="Limit training history to last N interactions per user (e.g. 1, 3, 5). "
+             "Simulates cold-start convergence as per proposal N∈{1,3,5} protocol.",
+    )
     args = parser.parse_args()
 
     load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
@@ -163,6 +240,8 @@ async def main() -> None:
     mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
     db_name = os.environ.get("DB_NAME", "movie_mrs")
     artifacts_dir = args.artifacts_dir or os.environ.get("ARTIFACTS_DIR", "/artifacts")
+    cf_threshold = int(os.environ.get("CF_THRESHOLD", str(_DEFAULT_CF_THRESHOLD)))
+    cf_alpha = float(os.environ.get("CF_ALPHA", str(_DEFAULT_CF_ALPHA)))
 
     logger.info(f"Connecting to MongoDB at {mongo_uri}, db={db_name}")
     client = AsyncMongoClient(mongo_uri)
@@ -182,8 +261,6 @@ async def main() -> None:
     else:
         logger.info("CF artifact not found — running pure content-based evaluation")
 
-    eval_state = EvalState(nlp_data, cf_data)
-
     # Query seed_user interactions
     logger.info("Querying seed_user_* interactions from MongoDB...")
     cursor = db.interactions.find({"user_id": {"$regex": "^seed_user_"}})
@@ -193,47 +270,39 @@ async def main() -> None:
     # Build leave-one-out test set
     test_set = build_leave_one_out_test_set(interactions, min_likes=5, max_users=args.max_users)
     logger.info(f"Built test set with {len(test_set)} qualifying users")
+    if args.history_limit:
+        logger.info(f"History limit: {args.history_limit} interactions per user (cold-start mode)")
 
     if not test_set:
         logger.warning("No qualifying users found — check seed interactions (need >=5 likes each)")
-        client.close()
+        await client.aclose()
         return
-
-    # Lazy import after sys.path manipulation above
-    from app.services.recommendation_service import RecommendationService  # noqa: E402
 
     precision_scores: list[float] = []
     ndcg_scores: list[float] = []
 
     for i, (user_id, held_out_id, training_ids) in enumerate(test_set):
-        # Derive genres from training movies: query and pick top 2 most frequent
-        genre_docs = await db.movies.find(
-            {"tmdb_id": {"$in": training_ids}},
-            {"genres": 1},
-        ).to_list(length=None)
+        # Apply history limit: use only the last N training interactions
+        eval_training = training_ids[-args.history_limit:] if args.history_limit else training_ids
 
-        genre_counter: Counter = Counter()
-        for gdoc in genre_docs:
-            for g in gdoc.get("genres", []):
-                genre_counter[g] += 1
-
-        top_genres = [g for g, _ in genre_counter.most_common(2)]
-        if not top_genres:
-            logger.debug(f"User {user_id}: no genre signal — skipping")
+        if not eval_training:
             continue
 
-        service = RecommendationService(db, eval_state)
-        try:
-            response = await service.get_recommendations(
-                genres=top_genres, mood=None, user_id=user_id
-            )
-        except Exception as exc:
-            logger.warning(f"User {user_id}: get_recommendations failed: {exc}")
+        # Score candidates directly from history (history-driven, no service call)
+        candidate_scores = score_from_history(eval_training, nlp_data, cf_data, cf_threshold, cf_alpha)
+
+        if not candidate_scores:
+            logger.debug(f"User {user_id}: no candidates — skipping")
             continue
 
-        recommended_ids = [r.tmdb_id for r in response.recommendations]
-        p = precision_at_k(recommended_ids, held_out_id)
-        n = compute_ndcg_at_k(recommended_ids, held_out_id)
+        # Exclude only training movies (seen); held-out stays in pool
+        for mid in set(training_ids):
+            candidate_scores.pop(mid, None)
+
+        top_ids = sorted(candidate_scores, key=lambda k: candidate_scores[k], reverse=True)[:10]
+
+        p = precision_at_k(top_ids, held_out_id)
+        n = compute_ndcg_at_k(top_ids, held_out_id)
         precision_scores.append(p)
         ndcg_scores.append(n)
 
@@ -246,7 +315,7 @@ async def main() -> None:
 
     if not precision_scores:
         logger.warning("No evaluation scores computed — all test cases skipped")
-        client.close()
+        await client.aclose()
         return
 
     avg_precision = sum(precision_scores) / len(precision_scores)
@@ -273,7 +342,7 @@ async def main() -> None:
         f"Written to      : {metrics_path}\n"
     )
 
-    client.close()
+    await client.aclose()
 
 
 if __name__ == "__main__":
