@@ -86,6 +86,6 @@ Users get accurate, context-aware movie recommendations with transparency ("reco
 ---
 ## Current State
 
-Phase 02 complete — content-based recommendation engine live. NLP pipeline processes 7,889 movies (TF-IDF, top-50 similarity index). POST /api/recommendations returns top-10 with explanations in < 3s. Genre/mood preference chips, recommendations page, and auth-gated "For You" navbar link all working. Ready for Phase 03 (collaborative filtering + hybrid engine).
+Phase 03 complete — collaborative filtering and hybrid engine live. Feedback API (POST /api/feedback) persists like/dislike to MongoDB interactions collection. CF batch pipeline builds item-item cosine similarity index (cf_index.joblib, 7,889 movies × 50 neighbors). Hybrid blending active: authenticated users with 5+ interactions get CF-weighted results (CF_ALPHA=0.5); cold-start falls back to pure content. Rate limiting: 10 req/min/user on recommendations with Retry-After header. Frontend: like/dislike buttons per card with optimistic toggle (green/red). Ready for Phase 04 (evaluation and demo preparation).
 
 *Last updated: 2026-03-26
