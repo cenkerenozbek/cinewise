@@ -128,6 +128,7 @@ async def client(test_db):
     # CF artifacts — disabled by default (Plan 03-03 will produce these)
     app.state.cf_top_indices = None
     app.state.cf_tmdb_ids = []
+    app.state.metrics = None
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -14,6 +15,7 @@ from app.core.config import settings
 from app.core.limiter import limiter
 from app.api.routes.auth import router as auth_router
 from app.api.routes.feedback import router as feedback_router
+from app.api.routes.metrics import router as metrics_router
 from app.api.routes.movies import router as movies_router
 from app.api.routes.recommendations import router as recommendations_router
 
@@ -62,6 +64,16 @@ async def lifespan(app: FastAPI):
         app.state.cf_tmdb_ids = []
         logger.info("CF artifact not found — hybrid blending disabled")
 
+    # Load evaluation metrics artifact
+    metrics_path = os.path.join(artifacts_dir, "metrics.json")
+    if os.path.exists(metrics_path):
+        with open(metrics_path) as f:
+            app.state.metrics = json.load(f)
+        logger.info("Metrics artifact loaded at startup")
+    else:
+        app.state.metrics = None
+        logger.info("metrics.json not found — /api/metrics will return 404")
+
     yield
 
     # Shutdown: close MongoDB connection
@@ -90,6 +102,7 @@ app.add_middleware(
 # Routers
 app.include_router(auth_router)
 app.include_router(feedback_router)
+app.include_router(metrics_router)
 app.include_router(movies_router)
 app.include_router(recommendations_router)
 
