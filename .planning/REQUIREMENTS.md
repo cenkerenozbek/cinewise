@@ -18,18 +18,18 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### NLP Processing
 
-- [ ] **NLP-01**: System preprocesses movie summary text (normalization, HTML cleaning, tokenization)
-- [ ] **NLP-02**: System extracts TF-IDF vectors from movie summaries
-- [ ] **NLP-03**: System builds precomputed similarity index (top-N similar movies per movie)
-- [ ] **NLP-04**: System extracts keywords/themes from summaries to support recommendation explanations
+- [x] **NLP-01**: System preprocesses movie summary text (normalization, HTML cleaning, tokenization)
+- [x] **NLP-02**: System extracts TF-IDF vectors from movie summaries
+- [x] **NLP-03**: System builds precomputed similarity index (top-N similar movies per movie)
+- [x] **NLP-04**: System extracts keywords/themes from summaries to support recommendation explanations
 
 ### Recommendation Engine
 
-- [ ] **REC-01**: System generates Top-K personalized movie recommendations
-- [ ] **REC-02**: System implements content-based recommendation using cosine similarity on TF-IDF
+- [x] **REC-01**: System generates Top-K personalized movie recommendations
+- [x] **REC-02**: System implements content-based recommendation using cosine similarity on TF-IDF
 - [ ] **REC-03**: System implements collaborative filtering signal from user interactions
 - [ ] **REC-04**: System combines content-based and collaborative signals using hybrid weighted scoring
-- [ ] **REC-05**: System handles cold-start users by relying on content-based + explicit preferences
+- [x] **REC-05**: System handles cold-start users by relying on content-based + explicit preferences
 
 ### User Interface
 
@@ -42,10 +42,10 @@ Requirements for initial release. Each maps to roadmap phases.
 ### API & Backend
 
 - [x] **API-01**: System exposes REST endpoints for movie listing/search/filtering
-- [ ] **API-02**: System exposes REST endpoint for recommendation retrieval
+- [x] **API-02**: System exposes REST endpoint for recommendation retrieval
 - [ ] **API-03**: System exposes REST endpoint for user feedback submission
 - [x] **API-04**: System integrates with TMDB API with retry/backoff error handling
-- [ ] **API-05**: Recommendation API responds within 3 seconds (p95)
+- [x] **API-05**: Recommendation API responds within 3 seconds (p95)
 - [x] **API-06**: Search API responds within 2 seconds (p95)
 - [ ] **API-07**: System supports at least 10 concurrent users
 
@@ -103,25 +103,25 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DATA-04 | Phase 1 | Complete |
 | DATA-05 | Phase 1 | Complete (01-01) |
 | DATA-06 | Phase 1 | Complete |
-| NLP-01 | Phase 2 | Pending |
-| NLP-02 | Phase 2 | Pending |
-| NLP-03 | Phase 2 | Pending |
-| NLP-04 | Phase 2 | Pending |
-| REC-01 | Phase 2 | Pending |
-| REC-02 | Phase 2 | Pending |
+| NLP-01 | Phase 2 | Complete |
+| NLP-02 | Phase 2 | Complete |
+| NLP-03 | Phase 2 | Complete |
+| NLP-04 | Phase 2 | Complete |
+| REC-01 | Phase 2 | Complete |
+| REC-02 | Phase 2 | Complete |
 | REC-03 | Phase 3 | Pending |
 | REC-04 | Phase 3 | Pending |
-| REC-05 | Phase 2 | Pending |
+| REC-05 | Phase 2 | Complete |
 | UI-01 | Phase 1 | Complete |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 1 | Complete |
 | UI-04 | Phase 2 | Pending |
 | UI-05 | Phase 3 | Pending |
 | API-01 | Phase 1 | Complete |
-| API-02 | Phase 2 | Pending |
+| API-02 | Phase 2 | Complete |
 | API-03 | Phase 3 | Pending |
 | API-04 | Phase 1 | Complete |
-| API-05 | Phase 2 | Pending |
+| API-05 | Phase 2 | Complete |
 | API-06 | Phase 1 | Complete |
 | API-07 | Phase 3 | Pending |
 | SEC-01 | Phase 1 | Complete (01-01) |

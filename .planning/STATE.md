@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-stopped_at: Phase 2 context gathered
-last_updated: "2026-03-25T20:56:10.402Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-03-26T04:14:58.881Z"
 progress:
   total_phases: 4
   completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  total_plans: 8
+  completed_plans: 5
 ---
 
 # Project State
@@ -19,11 +19,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-25)
 
 **Core value:** Users get accurate, context-aware movie recommendations with transparency ("recommended because...") even on their very first visit
-**Current focus:** Phase 01 — foundation-and-data-pipeline
+**Current focus:** Phase 02 — content-based-recommendation-engine
 
 ## Current Position
 
-Phase: 01 (foundation-and-data-pipeline) — EXECUTING
+Phase: 02 (content-based-recommendation-engine) — EXECUTING
 Plan: 2 of 4
 
 ## Performance Metrics
@@ -49,6 +49,7 @@ Plan: 2 of 4
 | Phase 01 P02 | 4 | 2 tasks | 14 files |
 | Phase 01 P03 | 2 | 2 tasks | 7 files |
 | Phase 01 P04 | 3 | 2 tasks | 14 files |
+| Phase 02 P01 | 2 | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - [Phase 01-04]: /auth/me returns user_id only — stored email in localStorage alongside token to reconstruct User object
 - [Phase 01-04]: AuthProvider returns null during token validation to prevent flash of unauthenticated state
 - [Phase 01-04]: FilterDropdowns calls useGenres() internally for self-contained genre population
+- [Phase 02]: USER_PREFERENCES_COLLECTION constant added to shared/config.py for consistent collection name across plans
+- [Phase 02]: mock_nlp_state fixture uses 10 fake movies with modular neighbor indices to test recommendations without real artifact files
 
 ### Pending Todos
 
@@ -87,6 +90,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-25T20:56:10.398Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-content-based-recommendation-engine/02-CONTEXT.md
+Last session: 2026-03-26T04:14:58.878Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
