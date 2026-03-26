@@ -121,6 +121,12 @@ None beyond the mongomock mutation bug documented above.
 ## User Setup Required
 None - no external service configuration required. NLP artifacts from Plan 02-02 must exist in ARTIFACTS_DIR for recommendations to function at runtime (graceful 503 otherwise).
 
+## Self-Check: PASSED
+
+All created files exist and both task commits verified:
+- dba4ec8 (Task 1): user_preferences_repo.py, recommendation_service.py, conftest.py, test_recommendations.py
+- 46b34c8 (Task 2): recommendations.py router, main.py NLP loading + router mount
+
 ## Next Phase Readiness
 - POST /api/recommendations fully operational: ready for Plan 02-04 (UI recommendation page integration)
 - GET /api/recommendations/preferences available for preference display in UI
