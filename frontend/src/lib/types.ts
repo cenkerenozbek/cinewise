@@ -57,3 +57,10 @@ export interface UserPreferences {
   genres: string[];
   mood: string | null;
 }
+
+export type FeedbackAction = "like" | "dislike";
+
+export interface UserInteraction {
+  movie_id: number;
+  action: FeedbackAction;
+}

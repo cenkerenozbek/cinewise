@@ -3,7 +3,9 @@ import { useRecommendations, useUserPreferences } from '../hooks/useRecommendati
 import { useGenres } from '../hooks/useMovies';
 import { MovieCard } from '../components/MovieCard';
 import { GenreChipGroup, MoodChipGroup } from '../components/PreferenceChips';
-import type { MovieSummary, RecommendationItem } from '../lib/types';
+import { useFeedback } from '../hooks/useFeedback';
+import { useAuth } from '../hooks/useAuth';
+import type { MovieSummary, RecommendationItem, FeedbackAction } from '../lib/types';
 
 function SkeletonCard() {
   return (
@@ -87,6 +89,7 @@ function PreferenceForm({
 export function RecommendationsPage() {
   const { data: savedPrefs, isLoading: prefsLoading } = useUserPreferences();
   const { data: genresData } = useGenres();
+  const { isAuthenticated } = useAuth();
 
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
@@ -95,6 +98,8 @@ export function RecommendationsPage() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showValidationError, setShowValidationError] = useState(false);
+  const [votes, setVotes] = useState<Map<number, FeedbackAction>>(new Map());
+  const { mutate: submitFeedback } = useFeedback();
 
   const availableGenres = genresData ?? [];
 
@@ -113,6 +118,7 @@ export function RecommendationsPage() {
     data: recommendationData,
     isLoading: recsLoading,
     isError,
+    error: recsError,
     refetch,
   } = useRecommendations(
     hasSubmitted ? submittedGenres : [],
@@ -136,6 +142,28 @@ export function RecommendationsPage() {
     setSubmittedMood(selectedMood);
     setHasSubmitted(true);
     setShowForm(false);
+  }
+
+  function handleVote(tmdbId: number, action: FeedbackAction) {
+    const prev = votes.get(tmdbId) ?? null;
+    setVotes((m) => new Map(m).set(tmdbId, action));
+    submitFeedback(
+      { movie_id: tmdbId, action },
+      {
+        onError: () => {
+          // Revert on failure
+          if (prev) {
+            setVotes((m) => new Map(m).set(tmdbId, prev));
+          } else {
+            setVotes((m) => {
+              const next = new Map(m);
+              next.delete(tmdbId);
+              return next;
+            });
+          }
+        },
+      }
+    );
   }
 
   const recommendations = recommendationData?.recommendations ?? [];
@@ -208,10 +236,21 @@ export function RecommendationsPage() {
       {/* State D: error */}
       {isError && !recsLoading && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h3 className="text-sm font-bold text-red-800 mb-1">Could not load recommendations</h3>
-          <p className="text-sm text-red-700 mb-3">
-            Something went wrong. Check your connection and try again.
-          </p>
+          {recsError && 'response' in recsError && (recsError as any).response?.status === 429 ? (
+            <>
+              <h3 className="text-sm font-bold text-red-800 mb-1">Too many requests</h3>
+              <p className="text-sm text-red-700 mb-3">
+                Please wait a moment before requesting new recommendations.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-sm font-bold text-red-800 mb-1">Could not load recommendations</h3>
+              <p className="text-sm text-red-700 mb-3">
+                Something went wrong. Check your connection and try again.
+              </p>
+            </>
+          )}
           <button
             type="button"
             onClick={() => refetch()}
@@ -243,7 +282,43 @@ export function RecommendationsPage() {
               {item.overview && (
                 <p className="mt-1 text-xs text-gray-400 line-clamp-2">{item.overview}</p>
               )}
-              <p className="mt-1 text-xs text-gray-500 italic">{item.explanation}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <p className="text-xs text-gray-500 italic flex-1">{item.explanation}</p>
+                {isAuthenticated && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleVote(item.tmdb_id, 'like')}
+                      className={`p-1 rounded transition-colors ${
+                        votes.get(item.tmdb_id) === 'like'
+                          ? 'text-green-600 bg-green-50'
+                          : 'text-gray-400 hover:text-green-500'
+                      }`}
+                      aria-label="Like"
+                      title="Like"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                        <path d="M1 8.998a1 1 0 0 1 1-1h3v9H2a1 1 0 0 1-1-1v-7Zm5.5 8.5h7.168a2 2 0 0 0 1.94-1.516l1.333-5.333A2 2 0 0 0 15 7.498H11V3.498a1.5 1.5 0 0 0-1.5-1.5.5.5 0 0 0-.462.31L6.5 8.498v9Z"/>
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleVote(item.tmdb_id, 'dislike')}
+                      className={`p-1 rounded transition-colors ${
+                        votes.get(item.tmdb_id) === 'dislike'
+                          ? 'text-red-600 bg-red-50'
+                          : 'text-gray-400 hover:text-red-500'
+                      }`}
+                      aria-label="Dislike"
+                      title="Dislike"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+                        <path d="M19 11.002a1 1 0 0 1-1 1h-3v-9h3a1 1 0 0 1 1 1v7Zm-5.5-8.5H6.332a2 2 0 0 0-1.94 1.516L3.06 9.351a2 2 0 0 0 1.94 2.484H9v3.5a1.5 1.5 0 0 0 1.5 1.5.5.5 0 0 0 .462-.31l2.538-6.023v-9Z"/>
+                      </svg>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           ))}
         </div>
