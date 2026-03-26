@@ -37,7 +37,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **UI-02**: User can specify genre preferences and optional mood selection (cold-start onboarding)
 - [x] **UI-03**: User can search movies by title and filter by genre/year
 - [x] **UI-04**: User can view recommendation results with poster, title, year, summary, and explanation
-- [ ] **UI-05**: User can provide like/dislike feedback on recommended movies
+- [x] **UI-05**: User can provide like/dislike feedback on recommended movies
 
 ### API & Backend
 
@@ -116,7 +116,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-02 | Phase 2 | Complete |
 | UI-03 | Phase 1 | Complete |
 | UI-04 | Phase 2 | Complete |
-| UI-05 | Phase 3 | Pending |
+| UI-05 | Phase 3 | Complete |
 | API-01 | Phase 1 | Complete |
 | API-02 | Phase 2 | Complete |
 | API-03 | Phase 3 | Complete |
