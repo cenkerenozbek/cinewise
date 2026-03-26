@@ -98,7 +98,7 @@ class RecommendationService:
         if not top_ids:
             return RecommendationResponse(recommendations=[])
 
-        docs = await self._db.movies.find({"tmdb_id": {"$in": top_ids}}).to_list(length=TOP_K)
+        docs = await self._db.movies.find({"tmdb_id": {"$in": top_ids}}).to_list(length=None)
 
         # Build response preserving score order
         doc_map = {d["tmdb_id"]: d for d in docs}

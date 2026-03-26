@@ -68,7 +68,7 @@ class MovieRepository:
     async def get_distinct_genres(self) -> list[str]:
         """Return a sorted list of distinct genre strings across all movies."""
         genres = await self.collection.distinct("genres")
-        return sorted(genres)
+        return sorted(g for g in genres if g is not None)
 
     async def upsert(self, tmdb_id: int, movie_data: dict) -> None:
         """Insert or update a movie document identified by *tmdb_id*."""

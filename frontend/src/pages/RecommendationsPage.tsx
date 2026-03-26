@@ -234,7 +234,10 @@ export function RecommendationsPage() {
           {recommendations.map((item) => (
             <div key={item.tmdb_id} className="flex flex-col">
               <MovieCard movie={toMovieSummary(item)} />
-              <p className="mt-1 text-xs text-gray-500">{item.explanation}</p>
+              {item.overview && (
+                <p className="mt-1 text-xs text-gray-400 line-clamp-2">{item.overview}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500 italic">{item.explanation}</p>
             </div>
           ))}
         </div>
