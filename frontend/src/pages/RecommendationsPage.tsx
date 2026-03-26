@@ -90,6 +90,8 @@ export function RecommendationsPage() {
 
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
+  const [submittedGenres, setSubmittedGenres] = useState<string[]>([]);
+  const [submittedMood, setSubmittedMood] = useState<string | null>(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [showValidationError, setShowValidationError] = useState(false);
@@ -101,6 +103,8 @@ export function RecommendationsPage() {
     if (savedPrefs && savedPrefs.genres.length > 0) {
       setSelectedGenres(savedPrefs.genres);
       setSelectedMood(savedPrefs.mood);
+      setSubmittedGenres(savedPrefs.genres);
+      setSubmittedMood(savedPrefs.mood);
       setHasSubmitted(true);
     }
   }, [savedPrefs]);
@@ -111,8 +115,8 @@ export function RecommendationsPage() {
     isError,
     refetch,
   } = useRecommendations(
-    hasSubmitted ? selectedGenres : [],
-    hasSubmitted ? selectedMood : null
+    hasSubmitted ? submittedGenres : [],
+    hasSubmitted ? submittedMood : null
   );
 
   function handleGenreToggle(genre: string) {
@@ -128,6 +132,8 @@ export function RecommendationsPage() {
       return;
     }
     setShowValidationError(false);
+    setSubmittedGenres(selectedGenres);
+    setSubmittedMood(selectedMood);
     setHasSubmitted(true);
     setShowForm(false);
   }
