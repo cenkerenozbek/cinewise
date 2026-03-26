@@ -81,7 +81,12 @@ Plans:
   2. At least 5 university students complete a UAT session without encountering a system crash or unhandled error
   3. All three cold-start scenarios (new user, obscure movie with few interactions, sparse system with few total interactions) produce valid recommendation results rather than empty lists or errors
   4. A full demo walkthrough — new user registration, preference selection, recommendation display, like/dislike feedback, returning user session — completes end-to-end without manual intervention
-**Plans**: TBD
+**Plans:** 3 plans
+
+Plans:
+- [ ] 04-01-PLAN.md — Cold-start robustness (genre fallback) and GET /api/metrics endpoint
+- [ ] 04-02-PLAN.md — Offline evaluation script (evaluate.py) and demo reset script (reset_demo.py)
+- [ ] 04-03-PLAN.md — Frontend metrics card and full demo walkthrough verification
 
 ## Progress
 
@@ -93,4 +98,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 | 1. Foundation and Data Pipeline | 4/4 | Complete | 2026-03-25 |
 | 2. Content-Based Recommendation Engine | 4/4 | Complete   | 2026-03-26 |
 | 3. Collaborative Filtering and Hybrid Engine | 4/4 | Complete   | 2026-03-26 |
-| 4. Evaluation and Demo Preparation | 0/TBD | Not started | - |
+| 4. Evaluation and Demo Preparation | 0/3 | Planning complete | - |
