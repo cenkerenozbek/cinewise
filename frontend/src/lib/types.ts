@@ -64,3 +64,10 @@ export interface UserInteraction {
   movie_id: number;
   action: FeedbackAction;
 }
+
+export interface MetricsData {
+  precision_at_10: number;
+  ndcg_at_10: number;
+  eval_date: string;
+  n_users: number;
+}

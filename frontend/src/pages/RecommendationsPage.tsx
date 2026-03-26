@@ -5,6 +5,7 @@ import { MovieCard } from '../components/MovieCard';
 import { GenreChipGroup, MoodChipGroup } from '../components/PreferenceChips';
 import { useFeedback } from '../hooks/useFeedback';
 import { useAuth } from '../hooks/useAuth';
+import { useMetrics } from '../hooks/useMetrics';
 import type { MovieSummary, RecommendationItem, FeedbackAction } from '../lib/types';
 
 function SkeletonCard() {
@@ -100,6 +101,7 @@ export function RecommendationsPage() {
   const [showValidationError, setShowValidationError] = useState(false);
   const [votes, setVotes] = useState<Map<number, FeedbackAction>>(new Map());
   const { mutate: submitFeedback } = useFeedback();
+  const { data: metrics } = useMetrics();
 
   const availableGenres = genresData ?? [];
 
@@ -198,6 +200,25 @@ export function RecommendationsPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-4">Your Recommendations</h1>
+
+      {/* Evaluation metrics -- shown only when metrics.json was loaded */}
+      {metrics && (
+        <div className="mb-4 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 flex items-center gap-4">
+          <span>
+            <span className="font-medium text-gray-700">Precision@10:</span>{' '}
+            {metrics.precision_at_10.toFixed(3)}
+          </span>
+          <span className="text-gray-300">|</span>
+          <span>
+            <span className="font-medium text-gray-700">NDCG@10:</span>{' '}
+            {metrics.ndcg_at_10.toFixed(3)}
+          </span>
+          <span className="text-gray-300">|</span>
+          <span>
+            Evaluated on {metrics.n_users} users ({metrics.eval_date})
+          </span>
+        </div>
+      )}
 
       {/* EditPreferencesControl */}
       <div className="mb-4">
