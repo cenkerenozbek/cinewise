@@ -33,6 +33,30 @@ def test_preprocess_text_combines_overview_and_genres():
     assert result == "A great film Action Thriller"
 
 
+def test_preprocess_text_includes_cast_and_director_with_weight():
+    """Cast (top 5) and director appear in output with 2x repetition for stronger TF-IDF weight."""
+    result = preprocess_text(
+        "A film",
+        ["Drama"],
+        cast=["Alice", "Bob", "Carol"],
+        director="David",
+    )
+    assert "Alice Bob Carol" in result
+    assert result.count("Alice Bob Carol") == 2
+    assert result.count("David") == 2
+
+
+def test_preprocess_text_caps_cast_at_five():
+    """Only the first 5 cast members are included to limit noise from minor roles."""
+    result = preprocess_text(
+        "A film",
+        ["Drama"],
+        cast=["A", "B", "C", "D", "E", "F", "G"],
+    )
+    assert "A B C D E" in result
+    assert "F" not in result.split()
+
+
 # --- NLP-02: TF-IDF vectorization ---
 
 

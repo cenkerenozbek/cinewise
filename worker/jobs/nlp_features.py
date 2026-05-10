@@ -31,19 +31,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger(__name__)
 
 
-def preprocess_text(overview: str | None, genres: list[str]) -> str:
-    """Build composite text from movie overview and genre list.
+def preprocess_text(
+    overview: str | None,
+    genres: list[str],
+    cast: list[str] | None = None,
+    director: str | None = None,
+) -> str:
+    """Build composite text from movie overview, genres, cast, and director.
 
-    Steps:
-    1. Coerce None overview to empty string.
-    2. Unescape HTML entities (e.g. &amp; -> &).
-    3. Strip HTML tags.
-    4. Normalize whitespace.
-    5. Append space-separated genre names.
+    Cast and director are weighted by repetition (×2) so they exert stronger
+    influence on TF-IDF similarity than passing mention in the overview.
 
     Args:
         overview: Movie overview text, may be None.
         genres: List of genre name strings.
+        cast: Optional list of cast member names.
+        director: Optional director name.
 
     Returns:
         Cleaned composite text string.
@@ -52,10 +55,15 @@ def preprocess_text(overview: str | None, genres: list[str]) -> str:
     text = html.unescape(text)
     text = re.sub(r"<[^>]+>", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
-    genre_str = " ".join(genres)
-    if text and genre_str:
-        return f"{text} {genre_str}"
-    return text or genre_str
+    parts = [text] if text else []
+    if genres:
+        parts.append(" ".join(genres))
+    if cast:
+        cast_str = " ".join(cast[:5])
+        parts.extend([cast_str, cast_str])  # ×2 weight
+    if director:
+        parts.extend([director, director])  # ×2 weight
+    return " ".join(parts)
 
 
 def build_tfidf_matrix(texts: list[str]):
@@ -154,11 +162,22 @@ async def main() -> None:
     db = client[db_name]
 
     logger.info("Reading movie documents from MongoDB...")
-    cursor = db.movies.find({}, {"tmdb_id": 1, "overview": 1, "genres": 1})
+    cursor = db.movies.find(
+        {},
+        {"tmdb_id": 1, "overview": 1, "genres": 1, "cast": 1, "director": 1},
+    )
     docs = await cursor.to_list(length=None)
     logger.info(f"Loaded {len(docs)} movie documents")
 
-    texts = [preprocess_text(d.get("overview"), d.get("genres", [])) for d in docs]
+    texts = [
+        preprocess_text(
+            d.get("overview"),
+            d.get("genres", []),
+            d.get("cast"),
+            d.get("director"),
+        )
+        for d in docs
+    ]
     tmdb_ids = [d["tmdb_id"] for d in docs]
 
     logger.info("Building TF-IDF matrix...")
