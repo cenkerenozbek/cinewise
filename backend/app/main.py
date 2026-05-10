@@ -28,6 +28,8 @@ async def lifespan(app: FastAPI):
     app.state.mongo_client = AsyncMongoClient(settings.MONGO_URI)
     app.state.db = app.state.mongo_client[settings.DB_NAME]
 
+    # Unique index on movies.tmdb_id prevents duplicate ingestion (eval bug 2026-05-10)
+    await app.state.db.movies.create_index([("tmdb_id", 1)], unique=True, name="tmdb_id_unique")
     # Create text index on movies.title for fast search
     await app.state.db.movies.create_index([("title", "text")])
     # Create compound index on movies.genres + movies.year for filter queries
