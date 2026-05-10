@@ -8,10 +8,15 @@ Covers:
 """
 import time
 import pytest
-import pytest_asyncio
 import numpy as np
 
-from app.services.recommendation_service import build_explanation, RecommendationService, _norm, _get_alpha
+from app.services.recommendation_service import (
+    build_explanation,
+    RecommendationService,
+    _apply_interaction_content_feedback,
+    _norm,
+    _get_alpha,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -118,6 +123,27 @@ async def test_endpoint_422_empty_genres(client_with_nlp):
     assert response.status_code == 422
 
 
+@pytest.mark.asyncio
+async def test_save_preferences_endpoint(client_with_nlp, test_db):
+    """POST /api/recommendations/preferences persists preferences for the logged-in user."""
+    from app.core.security import create_access_token
+
+    token = create_access_token("pref-user")
+    response = await client_with_nlp.post(
+        "/api/recommendations/preferences",
+        json={"genres": ["Action", "Thriller"], "mood": "Tense"},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"genres": ["Action", "Thriller"], "mood": "Tense"}
+
+    saved = await test_db.user_preferences.find_one({"user_id": "pref-user"})
+    assert saved is not None
+    assert saved["genres"] == ["Action", "Thriller"]
+    assert saved["mood"] == "Tense"
+
+
 # --- API-05: Response time ---
 
 @pytest.mark.asyncio
@@ -168,6 +194,44 @@ def test_alpha_at_threshold():
 def test_alpha_above_threshold():
     """_get_alpha returns cf_alpha when interaction count > threshold."""
     assert _get_alpha(10, 5, 0.5) == 0.5
+
+
+def test_content_feedback_boosts_liked_neighbors():
+    """A like immediately boosts content neighbors before CF threshold is reached."""
+    scores = {200: 1.0, 201: 1.0}
+    tmdb_ids = [100, 200, 201]
+    top_indices = np.array([[1, 2], [0, 2], [0, 1]], dtype=np.int32)
+
+    _apply_interaction_content_feedback(
+        scores,
+        liked_movie_ids=[100],
+        disliked_movie_ids=[],
+        tmdb_ids=tmdb_ids,
+        top_indices=top_indices,
+        feedback_weight=5.0,
+    )
+
+    assert scores[200] == 6.0
+    assert scores[201] == 6.0
+
+
+def test_content_feedback_penalizes_disliked_neighbors():
+    """A dislike immediately lowers content-neighbor scores."""
+    scores = {200: 10.0, 201: 10.0}
+    tmdb_ids = [100, 200, 201]
+    top_indices = np.array([[1, 2], [0, 2], [0, 1]], dtype=np.int32)
+
+    _apply_interaction_content_feedback(
+        scores,
+        liked_movie_ids=[],
+        disliked_movie_ids=[100],
+        tmdb_ids=tmdb_ids,
+        top_indices=top_indices,
+        feedback_weight=5.0,
+    )
+
+    assert scores[200] == 5.0
+    assert scores[201] == 5.0
 
 
 # ---------------------------------------------------------------------------

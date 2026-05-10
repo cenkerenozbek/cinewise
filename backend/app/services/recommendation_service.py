@@ -30,6 +30,44 @@ def _get_alpha(interaction_count: int, threshold: int, cf_alpha: float) -> float
         return cf_alpha
     return 1.0
 
+
+def _apply_interaction_content_feedback(
+    candidate_scores: dict[int, float],
+    liked_movie_ids: list[int],
+    disliked_movie_ids: list[int],
+    tmdb_ids: list[int],
+    top_indices,
+    feedback_weight: float,
+) -> None:
+    """Apply immediate content-neighbor feedback before CF threshold is reached.
+
+    Likes boost movies similar to the liked item. Dislikes penalize movies
+    similar to the disliked item. The interaction documents themselves are
+    still removed later so already-rated movies are not recommended back.
+    """
+    if not liked_movie_ids and not disliked_movie_ids:
+        return
+
+    id_to_idx = {tid: i for i, tid in enumerate(tmdb_ids)}
+
+    for liked_id in liked_movie_ids:
+        liked_idx = id_to_idx.get(liked_id)
+        if liked_idx is None:
+            continue
+        for neighbor_idx in top_indices[liked_idx]:
+            neighbor_id = tmdb_ids[int(neighbor_idx)]
+            candidate_scores[neighbor_id] = candidate_scores.get(neighbor_id, 0.0) + feedback_weight
+
+    for disliked_id in disliked_movie_ids:
+        disliked_idx = id_to_idx.get(disliked_id)
+        if disliked_idx is None:
+            continue
+        for neighbor_idx in top_indices[disliked_idx]:
+            neighbor_id = tmdb_ids[int(neighbor_idx)]
+            if neighbor_id in candidate_scores:
+                candidate_scores[neighbor_id] -= feedback_weight
+
+
 MOOD_GENRE_MAP = {
     "Tense": ["Thriller", "Horror"],
     "Romantic": ["Romance", "Drama"],
@@ -137,9 +175,29 @@ class RecommendationService:
         # Determine alpha based on user's interaction count
         alpha = 1.0  # default: pure content
         user_interactions: list = []
+        liked_movie_ids: list[int] = []
+        disliked_movie_ids: list[int] = []
         if user_id:
             interactions_repo = InteractionsRepository(self._db)
             user_interactions = await interactions_repo.get_by_user_id(user_id)
+            liked_movie_ids = [ia["movie_id"] for ia in user_interactions if ia["action"] == "like"]
+            disliked_movie_ids = [
+                ia["movie_id"] for ia in user_interactions if ia["action"] == "dislike"
+            ]
+
+            # First-feedback personalization: content neighbors of liked movies
+            # are promoted and neighbors of disliked movies are demoted. CF still
+            # takes over once the configured threshold is reached.
+            feedback_weight = max(5.0, min(30.0, len(genre_docs) / 20.0))
+            _apply_interaction_content_feedback(
+                candidate_scores,
+                liked_movie_ids,
+                disliked_movie_ids,
+                tmdb_ids,
+                top_indices,
+                feedback_weight,
+            )
+
             interaction_count = len(user_interactions)
             if self._state.cf_top_indices is not None:
                 alpha = _get_alpha(interaction_count, settings.CF_THRESHOLD, settings.CF_ALPHA)

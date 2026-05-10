@@ -1,1 +1,1 @@
-export { useAuthContext as useAuth } from '../features/auth/AuthContext';
+export { useAuthContext as useAuth } from '../features/auth/auth-context';

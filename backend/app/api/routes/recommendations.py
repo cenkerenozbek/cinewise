@@ -63,3 +63,16 @@ async def get_preferences(
     if prefs is None:
         return {"genres": [], "mood": None}
     return {"genres": prefs.get("genres", []), "mood": prefs.get("mood")}
+
+
+@router.post("/preferences")
+async def save_preferences(
+    body: PreferenceRequest,
+    user_id: str = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict:
+    """Persist recommendation preferences without requiring a recommendation refresh."""
+    from app.repositories.user_preferences_repo import UserPreferencesRepository
+    repo = UserPreferencesRepository(db)
+    await repo.upsert(user_id, body.genres, body.mood)
+    return {"genres": body.genres, "mood": body.mood}

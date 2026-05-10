@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react';
-import { useRecommendations, useUserPreferences } from '../hooks/useRecommendations';
+import { useState } from 'react';
+import { isAxiosError } from 'axios';
+import {
+  useRecommendations,
+  useSaveUserPreferences,
+  useUserPreferences,
+} from '../hooks/useRecommendations';
 import { useGenres } from '../hooks/useMovies';
-import { MovieCard } from '../components/MovieCard';
 import { GenreChipGroup, MoodChipGroup } from '../components/PreferenceChips';
+import { RecommendationCard } from '../components/RecommendationCard';
 import { useFeedback } from '../hooks/useFeedback';
 import { useAuth } from '../hooks/useAuth';
 import { useMetrics } from '../hooks/useMetrics';
-import type { MovieSummary, RecommendationItem, FeedbackAction } from '../lib/types';
+import type { FeedbackAction, UserPreferences } from '../lib/types';
 
 function SkeletonCard() {
   return (
@@ -18,18 +23,6 @@ function SkeletonCard() {
       </div>
     </div>
   );
-}
-
-function toMovieSummary(item: RecommendationItem): MovieSummary {
-  return {
-    tmdb_id: item.tmdb_id,
-    title: item.title,
-    title_tr: item.title_tr,
-    year: item.year,
-    genres: item.genres,
-    poster_path: item.poster_path,
-    rating: item.rating,
-  };
 }
 
 interface PreferenceFormProps {
@@ -88,33 +81,30 @@ function PreferenceForm({
 }
 
 export function RecommendationsPage() {
-  const { data: savedPrefs, isLoading: prefsLoading } = useUserPreferences();
+  const { isAuthenticated, user } = useAuth();
+  const authCacheKey = user?.id ?? 'anonymous';
+  const { data: savedPrefs, isLoading: prefsLoading } = useUserPreferences(
+    isAuthenticated,
+    authCacheKey,
+  );
   const { data: genresData } = useGenres();
-  const { isAuthenticated } = useAuth();
 
-  const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const [submittedGenres, setSubmittedGenres] = useState<string[]>([]);
-  const [submittedMood, setSubmittedMood] = useState<string | null>(null);
-  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [draftPrefs, setDraftPrefs] = useState<UserPreferences | null>(null);
+  const [submittedPrefs, setSubmittedPrefs] = useState<UserPreferences | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showValidationError, setShowValidationError] = useState(false);
   const [votes, setVotes] = useState<Map<number, FeedbackAction>>(new Map());
   const { mutate: submitFeedback } = useFeedback();
+  const { mutate: savePreferences, isPending: isSavingPreferences } =
+    useSaveUserPreferences(authCacheKey);
   const { data: metrics } = useMetrics();
 
   const availableGenres = genresData ?? [];
-
-  // Populate from saved preferences on mount
-  useEffect(() => {
-    if (savedPrefs && savedPrefs.genres.length > 0) {
-      setSelectedGenres(savedPrefs.genres);
-      setSelectedMood(savedPrefs.mood);
-      setSubmittedGenres(savedPrefs.genres);
-      setSubmittedMood(savedPrefs.mood);
-      setHasSubmitted(true);
-    }
-  }, [savedPrefs]);
+  const savedActivePrefs = savedPrefs && savedPrefs.genres.length > 0 ? savedPrefs : null;
+  const activePrefs = submittedPrefs ?? savedActivePrefs;
+  const selectedGenres = draftPrefs?.genres ?? activePrefs?.genres ?? [];
+  const selectedMood = draftPrefs?.mood ?? activePrefs?.mood ?? null;
+  const hasSubmitted = Boolean(activePrefs);
 
   const {
     data: recommendationData,
@@ -123,15 +113,31 @@ export function RecommendationsPage() {
     error: recsError,
     refetch,
   } = useRecommendations(
-    hasSubmitted ? submittedGenres : [],
-    hasSubmitted ? submittedMood : null
+    activePrefs?.genres ?? [],
+    activePrefs?.mood ?? null,
+    authCacheKey,
   );
 
   function handleGenreToggle(genre: string) {
-    setSelectedGenres((prev) =>
-      prev.includes(genre) ? prev.filter((g) => g !== genre) : [...prev, genre]
-    );
+    setDraftPrefs((prev) => {
+      const baseGenres = prev?.genres ?? selectedGenres;
+      const nextGenres = baseGenres.includes(genre)
+        ? baseGenres.filter((g) => g !== genre)
+        : [...baseGenres, genre];
+
+      return {
+        genres: nextGenres,
+        mood: prev?.mood ?? selectedMood,
+      };
+    });
     setShowValidationError(false);
+  }
+
+  function handleMoodSelect(mood: string | null) {
+    setDraftPrefs((prev) => ({
+      genres: prev?.genres ?? selectedGenres,
+      mood,
+    }));
   }
 
   function handleSubmit() {
@@ -139,10 +145,11 @@ export function RecommendationsPage() {
       setShowValidationError(true);
       return;
     }
+    const nextPrefs = { genres: selectedGenres, mood: selectedMood };
     setShowValidationError(false);
-    setSubmittedGenres(selectedGenres);
-    setSubmittedMood(selectedMood);
-    setHasSubmitted(true);
+    setSubmittedPrefs(nextPrefs);
+    setDraftPrefs(nextPrefs);
+    savePreferences(nextPrefs);
     setShowForm(false);
   }
 
@@ -169,6 +176,20 @@ export function RecommendationsPage() {
   }
 
   const recommendations = recommendationData?.recommendations ?? [];
+  const rateLimited = isAxiosError(recsError) && recsError.response?.status === 429;
+
+  if (prefsLoading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <h1 className="text-2xl font-bold text-gray-900 mb-4">Your Recommendations</h1>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   // State A: no preferences submitted yet (and no saved prefs loading)
   if (!hasSubmitted && !prefsLoading) {
@@ -187,7 +208,7 @@ export function RecommendationsPage() {
             selectedGenres={selectedGenres}
             selectedMood={selectedMood}
             onGenreToggle={handleGenreToggle}
-            onMoodSelect={setSelectedMood}
+            onMoodSelect={handleMoodSelect}
             onSubmit={handleSubmit}
             submitLabel="Get My Recommendations"
             showValidationError={showValidationError}
@@ -220,6 +241,15 @@ export function RecommendationsPage() {
         </div>
       )}
 
+      {activePrefs && (
+        <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+          <span className="font-bold">Active preferences:</span>{' '}
+          {activePrefs.genres.join(', ')}
+          {activePrefs.mood ? ` / ${activePrefs.mood}` : ''}
+          {isSavingPreferences && <span className="ml-2 text-blue-700">Saving...</span>}
+        </div>
+      )}
+
       {/* EditPreferencesControl */}
       <div className="mb-4">
         <button
@@ -236,7 +266,7 @@ export function RecommendationsPage() {
               selectedGenres={selectedGenres}
               selectedMood={selectedMood}
               onGenreToggle={handleGenreToggle}
-              onMoodSelect={setSelectedMood}
+              onMoodSelect={handleMoodSelect}
               onSubmit={handleSubmit}
               submitLabel="Update Recommendations"
               showValidationError={showValidationError}
@@ -257,7 +287,7 @@ export function RecommendationsPage() {
       {/* State D: error */}
       {isError && !recsLoading && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          {recsError && 'response' in recsError && (recsError as any).response?.status === 429 ? (
+          {rateLimited ? (
             <>
               <h3 className="text-sm font-bold text-red-800 mb-1">Too many requests</h3>
               <p className="text-sm text-red-700 mb-3">
@@ -298,49 +328,13 @@ export function RecommendationsPage() {
       {!recsLoading && !isError && recommendations.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {recommendations.map((item) => (
-            <div key={item.tmdb_id} className="flex flex-col">
-              <MovieCard movie={toMovieSummary(item)} />
-              {item.overview && (
-                <p className="mt-1 text-xs text-gray-400 line-clamp-2">{item.overview}</p>
-              )}
-              <div className="mt-1 flex items-center gap-2">
-                <p className="text-xs text-gray-500 italic flex-1">{item.explanation}</p>
-                {isAuthenticated && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => handleVote(item.tmdb_id, 'like')}
-                      className={`p-1 rounded transition-colors ${
-                        votes.get(item.tmdb_id) === 'like'
-                          ? 'text-green-600 bg-green-50'
-                          : 'text-gray-400 hover:text-green-500'
-                      }`}
-                      aria-label="Like"
-                      title="Like"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                        <path d="M1 8.998a1 1 0 0 1 1-1h3v9H2a1 1 0 0 1-1-1v-7Zm5.5 8.5h7.168a2 2 0 0 0 1.94-1.516l1.333-5.333A2 2 0 0 0 15 7.498H11V3.498a1.5 1.5 0 0 0-1.5-1.5.5.5 0 0 0-.462.31L6.5 8.498v9Z"/>
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleVote(item.tmdb_id, 'dislike')}
-                      className={`p-1 rounded transition-colors ${
-                        votes.get(item.tmdb_id) === 'dislike'
-                          ? 'text-red-600 bg-red-50'
-                          : 'text-gray-400 hover:text-red-500'
-                      }`}
-                      aria-label="Dislike"
-                      title="Dislike"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
-                        <path d="M19 11.002a1 1 0 0 1-1 1h-3v-9h3a1 1 0 0 1 1 1v7Zm-5.5-8.5H6.332a2 2 0 0 0-1.94 1.516L3.06 9.351a2 2 0 0 0 1.94 2.484H9v3.5a1.5 1.5 0 0 0 1.5 1.5.5.5 0 0 0 .462-.31l2.538-6.023v-9Z"/>
-                      </svg>
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
+            <RecommendationCard
+              key={item.tmdb_id}
+              item={item}
+              vote={votes.get(item.tmdb_id)}
+              onVote={handleVote}
+              showFeedback={isAuthenticated}
+            />
           ))}
         </div>
       )}

@@ -109,6 +109,16 @@ app.include_router(movies_router)
 app.include_router(recommendations_router)
 
 
+@app.get("/")
+async def root():
+    return {
+        "name": "CineWise API",
+        "status": "ok",
+        "docs": "/docs",
+        "health": "/api/health",
+    }
+
+
 @app.get("/api/health")
 async def health_check():
     return {"status": "ok"}

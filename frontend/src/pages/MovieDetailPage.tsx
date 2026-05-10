@@ -1,11 +1,31 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useMovieDetail } from '../hooks/useMovies';
+import { FeedbackControls } from '../components/FeedbackControls';
+import { useAuth } from '../hooks/useAuth';
+import { useFeedback } from '../hooks/useFeedback';
+import type { FeedbackAction } from '../lib/types';
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w500';
 
 export function MovieDetailPage() {
   const { tmdbId } = useParams<{ tmdbId: string }>();
   const { data: movie, isLoading, isError } = useMovieDetail(Number(tmdbId));
+  const { isAuthenticated } = useAuth();
+  const { mutate: submitFeedback, isPending: feedbackPending } = useFeedback();
+  const [vote, setVote] = useState<FeedbackAction | undefined>();
+
+  function handleVote(action: FeedbackAction) {
+    if (!movie) return;
+    const prev = vote;
+    setVote(action);
+    submitFeedback(
+      { movie_id: movie.tmdb_id, action },
+      {
+        onError: () => setVote(prev),
+      },
+    );
+  }
 
   if (isLoading) {
     return (
@@ -125,6 +145,30 @@ export function MovieDetailPage() {
               <p className="text-sm text-gray-700 leading-relaxed">{movie.overview}</p>
             </div>
           )}
+          <div className="mt-5 max-w-sm">
+            {isAuthenticated ? (
+              <>
+                <FeedbackControls title={movie.title} vote={vote} onVote={handleVote} />
+                <p className="mt-2 text-xs text-gray-500">
+                  {feedbackPending
+                    ? 'Saving feedback...'
+                    : 'Your feedback updates For You recommendations.'}
+                </p>
+              </>
+            ) : (
+              <div className="rounded-lg border border-blue-100 bg-blue-50 p-4">
+                <p className="text-sm font-medium text-blue-900">
+                  Sign in to like or dislike movies and improve your recommendations.
+                </p>
+                <Link
+                  to="/login"
+                  className="mt-3 inline-flex h-10 items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700"
+                >
+                  Sign In
+                </Link>
+              </div>
+            )}
+          </div>
           {/* Additional stats */}
           {(movie.vote_count !== null || movie.popularity !== null) && (
             <div className="mt-4 flex gap-4 text-xs text-gray-500">

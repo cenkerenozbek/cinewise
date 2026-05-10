@@ -1,9 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import api from '../../lib/api';
 import type { AuthState, User } from '../../lib/types';
-
-const AuthContext = createContext<AuthState | null>(null);
+import { AuthContext } from './auth-context';
 
 interface AuthProviderProps {
   children: ReactNode;
@@ -12,30 +11,45 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() =>
+    Boolean(localStorage.getItem('token') && localStorage.getItem('user_email')),
+  );
 
   // Validate token on mount by calling /auth/me
   useEffect(() => {
+    let cancelled = false;
     const storedToken = localStorage.getItem('token');
     const storedEmail = localStorage.getItem('user_email');
-    if (storedToken && storedEmail) {
-      // Validate token is still valid
-      api
-        .get<{ user_id: string }>('/auth/me', {
-          headers: { Authorization: `Bearer ${storedToken}` },
-        })
-        .then((res) => {
+    if (!storedToken || !storedEmail) {
+      return undefined;
+    }
+
+    // Validate token is still valid
+    api
+      .get<{ user_id: string }>('/auth/me', {
+        headers: { Authorization: `Bearer ${storedToken}` },
+      })
+      .then((res) => {
+        if (!cancelled) {
           setToken(storedToken);
           setUser({ id: res.data.user_id, email: storedEmail });
-        })
-        .catch(() => {
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
           localStorage.removeItem('token');
           localStorage.removeItem('user_email');
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
@@ -88,12 +102,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuthContext(): AuthState {
-  const ctx = useContext(AuthContext);
-  if (!ctx) {
-    throw new Error('useAuthContext must be used within AuthProvider');
-  }
-  return ctx;
 }

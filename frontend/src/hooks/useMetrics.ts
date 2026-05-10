@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import api from '../lib/api';
 import type { MetricsData } from '../lib/types';
 
@@ -9,8 +10,8 @@ export function useMetrics() {
       try {
         const { data } = await api.get<MetricsData>('/metrics');
         return data;
-      } catch (err: any) {
-        if (err?.response?.status === 404) return null;
+      } catch (err: unknown) {
+        if (isAxiosError(err) && err.response?.status === 404) return null;
         throw err;
       }
     },
