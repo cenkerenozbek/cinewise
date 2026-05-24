@@ -40,30 +40,35 @@ async def lifespan(app: FastAPI):
 
     # Load NLP artifacts for recommendation engine
     artifacts_dir = os.environ.get("ARTIFACTS_DIR", "/artifacts")
-    vectorizer_path = os.path.join(artifacts_dir, "tfidf_vectorizer.joblib")
     index_path = os.path.join(artifacts_dir, "similarity_index.joblib")
-    if os.path.exists(vectorizer_path) and os.path.exists(index_path):
-        app.state.tfidf_vectorizer = joblib.load(vectorizer_path)
+    if os.path.exists(index_path):
         sim_data = joblib.load(index_path)
         app.state.tmdb_ids = sim_data["tmdb_ids"]
         app.state.top_indices = sim_data["top_indices"]
+        # top_scores is present in new-format artifacts (sentence-transformers);
+        # absent in old TF-IDF artifacts — service falls back to frequency count
+        app.state.top_scores = sim_data.get("top_scores")
+        app.state.tfidf_vectorizer = None  # no longer used at runtime
         logger.info("NLP artifacts loaded at startup")
     else:
         app.state.tfidf_vectorizer = None
         app.state.tmdb_ids = []
         app.state.top_indices = None
+        app.state.top_scores = None
         logger.warning("NLP artifacts not found — recommendations unavailable until worker runs")
 
-    # Load CF artifacts for hybrid blending (Plan 03-03 will produce this file)
+    # Load CF artifacts for hybrid blending
     cf_index_path = os.path.join(artifacts_dir, "cf_index.joblib")
     if os.path.exists(cf_index_path):
         cf_data = joblib.load(cf_index_path)
         app.state.cf_top_indices = cf_data["cf_top_indices"]
         app.state.cf_tmdb_ids = cf_data["tmdb_ids"]
+        app.state.cf_top_scores = cf_data.get("cf_top_scores")
         logger.info("CF artifact loaded at startup")
     else:
         app.state.cf_top_indices = None
         app.state.cf_tmdb_ids = []
+        app.state.cf_top_scores = None
         logger.info("CF artifact not found — hybrid blending disabled")
 
     # Load evaluation metrics artifact

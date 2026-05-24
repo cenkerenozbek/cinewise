@@ -181,19 +181,32 @@ def test_norm_empty():
     assert result == {}
 
 
-def test_alpha_below_threshold():
-    """_get_alpha returns 1.0 (pure content) when interaction count < threshold."""
-    assert _get_alpha(3, 5, 0.5) == 1.0
+def test_alpha_zero_interactions_is_pure_content():
+    """_get_alpha returns exactly 1.0 (pure content) when there are no interactions."""
+    assert _get_alpha(0, 5, 0.5) == 1.0
 
 
-def test_alpha_at_threshold():
-    """_get_alpha returns cf_alpha at exactly the threshold."""
-    assert _get_alpha(5, 5, 0.5) == 0.5
+def test_alpha_few_interactions_stays_high():
+    """With only 1 interaction, alpha stays well above 0.85 (mostly content)."""
+    assert _get_alpha(1, 5, 0.5) > 0.85
 
 
-def test_alpha_above_threshold():
-    """_get_alpha returns cf_alpha when interaction count > threshold."""
-    assert _get_alpha(10, 5, 0.5) == 0.5
+def test_alpha_many_interactions_converges_to_cf_alpha():
+    """With many interactions (50+), alpha converges close to cf_alpha (0.5)."""
+    assert _get_alpha(50, 5, 0.5) < 0.55
+
+
+def test_alpha_monotonically_decreasing():
+    """Alpha decreases (or stays equal) as interaction count increases."""
+    alphas = [_get_alpha(n, 5, 0.5) for n in range(0, 25)]
+    assert all(alphas[i] >= alphas[i + 1] for i in range(len(alphas) - 1))
+
+
+def test_alpha_always_bounded():
+    """Alpha is always in [cf_alpha, 1.0] regardless of interaction count."""
+    for n in range(0, 30):
+        a = _get_alpha(n, 5, 0.5)
+        assert 0.5 <= a <= 1.0
 
 
 def test_content_feedback_boosts_liked_neighbors():

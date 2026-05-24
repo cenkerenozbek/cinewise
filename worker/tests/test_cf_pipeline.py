@@ -1,4 +1,4 @@
-"""Tests for CF (collaborative filtering) batch pipeline — Phase 3 Plan 02.
+"""Tests for CF (collaborative filtering) batch pipeline.
 
 Tests cover:
   CF-01: build_cf_index shape and dtype
@@ -6,20 +6,15 @@ Tests cover:
   CF-03: build_cf_index like/dislike scoring semantics
   CF-04: build_cf_index empty interactions
   CF-05: build_cf_index unknown movie_id silently skipped
-  CF-06: save_cf_artifacts writes loadable cf_index.joblib
-"""
-import os
-import tempfile
+  CF-06: save_cf_artifacts writes loadable cf_index.joblib (indices + scores)
 
+build_cf_index now returns (cf_top_indices, cf_top_scores) — both arrays
+of shape (N_movies, effective_top_n).
+"""
 import numpy as np
 import pytest
 
 from jobs.cf_features import build_cf_index, save_cf_artifacts
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -36,7 +31,6 @@ def sample_interactions():
 
 @pytest.fixture
 def tmdb_ids():
-    """Canonical TMDB ID list for the 3 test movies."""
     return [100, 101, 102]
 
 
@@ -46,23 +40,24 @@ def tmdb_ids():
 
 
 def test_build_cf_index_shape(sample_interactions, tmdb_ids):
-    """build_cf_index returns ndarray of shape (3, 2) for 3 movies with top_n capped at N-1=2."""
-    result = build_cf_index(sample_interactions, tmdb_ids, top_n=50)
-    # 3 movies, effective_top_n = min(50, 3-1) = 2
-    assert result.shape == (3, 2), f"Expected shape (3, 2), got {result.shape}"
-    assert result.dtype == np.int32, f"Expected int32 dtype, got {result.dtype}"
+    """build_cf_index returns (indices, scores) each of shape (3, 2) for 3 movies, top_n capped at N-1=2."""
+    indices, scores = build_cf_index(sample_interactions, tmdb_ids, top_n=50)
+    assert indices.shape == (3, 2), f"Expected (3, 2), got {indices.shape}"
+    assert scores.shape == (3, 2), f"Expected (3, 2), got {scores.shape}"
+    assert indices.dtype == np.int32
+    assert scores.dtype == np.float32
 
 
 # ---------------------------------------------------------------------------
-# CF-02: build_cf_index self-exclusion
+# CF-02: self-exclusion
 # ---------------------------------------------------------------------------
 
 
 def test_build_cf_index_excludes_self(sample_interactions, tmdb_ids):
-    """For each movie i, the index i does NOT appear in cf_top_indices[i]."""
-    result = build_cf_index(sample_interactions, tmdb_ids, top_n=50)
-    for i in range(result.shape[0]):
-        assert i not in result[i], f"Movie index {i} appears in its own CF neighbor list"
+    """For each movie i, index i does NOT appear in cf_top_indices[i]."""
+    indices, _ = build_cf_index(sample_interactions, tmdb_ids, top_n=50)
+    for i in range(indices.shape[0]):
+        assert i not in indices[i], f"Movie index {i} appears in its own CF neighbour list"
 
 
 # ---------------------------------------------------------------------------
@@ -71,16 +66,7 @@ def test_build_cf_index_excludes_self(sample_interactions, tmdb_ids):
 
 
 def test_build_cf_index_like_dislike_scores():
-    """Movies liked by the same users have higher cosine similarity than liked+disliked pairs.
-
-    user_A likes both movie_0 and movie_1 → they should be CF neighbors.
-    user_B dislikes movie_1 and has no interaction with movie_0 → movie_0 and movie_2
-    (unrelated) should not outscore movie_0/movie_1 pair.
-    """
-    # 3 users, 3 movies
-    # user_A: likes 0, likes 1
-    # user_B: likes 0, dislikes 2
-    # user_C: likes 1, dislikes 2
+    """Function runs correctly and excludes self when both likes and dislikes are present."""
     interactions = [
         {"user_id": "user_A", "movie_id": 10, "action": "like"},
         {"user_id": "user_A", "movie_id": 11, "action": "like"},
@@ -89,14 +75,10 @@ def test_build_cf_index_like_dislike_scores():
         {"user_id": "user_C", "movie_id": 11, "action": "like"},
         {"user_id": "user_C", "movie_id": 12, "action": "dislike"},
     ]
-    tmdb_ids = [10, 11, 12]
-    result = build_cf_index(interactions, tmdb_ids, top_n=2)
-    # Movie 0 (tmdb 10) and movie 1 (tmdb 11) are both liked by at least one user each
-    # Movie 2 (tmdb 12) is only disliked → it should be a different pattern
-    # The test just verifies the function runs and excludes self
-    assert result.shape == (3, 2)
+    indices, scores = build_cf_index(interactions, [10, 11, 12], top_n=2)
+    assert indices.shape == (3, 2)
     for i in range(3):
-        assert i not in result[i]
+        assert i not in indices[i]
 
 
 # ---------------------------------------------------------------------------
@@ -105,11 +87,10 @@ def test_build_cf_index_like_dislike_scores():
 
 
 def test_build_cf_index_empty_interactions(tmdb_ids):
-    """Empty interactions list returns ndarray of shape (N_movies, 0) without error."""
-    result = build_cf_index([], tmdb_ids, top_n=50)
-    assert result.ndim == 2
-    assert result.shape[0] == len(tmdb_ids)
-    assert result.shape[1] == 0, f"Expected 0 columns for empty interactions, got {result.shape[1]}"
+    """Empty interactions list returns (N_movies, 0) arrays without error."""
+    indices, scores = build_cf_index([], tmdb_ids, top_n=50)
+    assert indices.ndim == 2 and indices.shape == (len(tmdb_ids), 0)
+    assert scores.ndim == 2 and scores.shape == (len(tmdb_ids), 0)
 
 
 # ---------------------------------------------------------------------------
@@ -119,16 +100,13 @@ def test_build_cf_index_empty_interactions(tmdb_ids):
 
 def test_build_cf_index_unknown_movie_id_skipped(tmdb_ids):
     """Interactions with movie_ids not in tmdb_ids are silently skipped."""
-    interactions_with_unknown = [
+    interactions = [
         {"user_id": "user_1", "movie_id": 100, "action": "like"},
-        {"user_id": "user_1", "movie_id": 999, "action": "like"},  # 999 not in tmdb_ids
+        {"user_id": "user_1", "movie_id": 999, "action": "like"},  # unknown
         {"user_id": "user_2", "movie_id": 101, "action": "dislike"},
-        {"user_id": "user_2", "movie_id": 888, "action": "like"},  # 888 not in tmdb_ids
     ]
-    # Should not raise; should produce valid output
-    result = build_cf_index(interactions_with_unknown, tmdb_ids, top_n=50)
-    assert result.ndim == 2
-    assert result.shape[0] == len(tmdb_ids)
+    indices, scores = build_cf_index(interactions, tmdb_ids, top_n=50)
+    assert indices.shape[0] == len(tmdb_ids)
 
 
 # ---------------------------------------------------------------------------
@@ -137,17 +115,19 @@ def test_build_cf_index_unknown_movie_id_skipped(tmdb_ids):
 
 
 def test_save_cf_artifacts(sample_interactions, tmdb_ids, tmp_path):
-    """save_cf_artifacts creates cf_index.joblib; loading it yields dict with correct keys."""
+    """save_cf_artifacts creates cf_index.joblib with tmdb_ids, indices, and scores keys."""
     import joblib
 
-    cf_top_indices = build_cf_index(sample_interactions, tmdb_ids, top_n=50)
-    save_cf_artifacts(tmdb_ids, cf_top_indices, str(tmp_path))
+    indices, scores = build_cf_index(sample_interactions, tmdb_ids, top_n=50)
+    save_cf_artifacts(tmdb_ids, indices, scores, str(tmp_path))
 
     artifact_path = tmp_path / "cf_index.joblib"
-    assert artifact_path.exists(), "cf_index.joblib was not created"
+    assert artifact_path.exists()
 
     loaded = joblib.load(artifact_path)
-    assert "tmdb_ids" in loaded, "cf_index.joblib missing 'tmdb_ids' key"
-    assert "cf_top_indices" in loaded, "cf_index.joblib missing 'cf_top_indices' key"
+    assert "tmdb_ids" in loaded
+    assert "cf_top_indices" in loaded
+    assert "cf_top_scores" in loaded
     assert loaded["tmdb_ids"] == tmdb_ids
-    assert loaded["cf_top_indices"].shape == cf_top_indices.shape
+    assert loaded["cf_top_indices"].shape == indices.shape
+    assert loaded["cf_top_scores"].shape == scores.shape

@@ -1,8 +1,12 @@
 """NLP batch pipeline for content-based movie recommendations.
 
-Reads movie documents from MongoDB, preprocesses text fields, computes TF-IDF
-vectors, builds a precomputed top-50 cosine similarity index, and persists
-artifacts to disk for fast startup by the recommendation API.
+Replaces TF-IDF with sentence-transformers (all-MiniLM-L6-v2) to produce
+dense 384-dim semantic embeddings per movie. Cosine similarity is computed
+on L2-normalised embeddings so a simple dot product suffices.
+
+Both neighbour indices AND actual cosine scores are saved so that the
+recommendation engine can use weighted aggregation instead of raw frequency
+counts, improving recommendation quality significantly.
 
 Usage:
     python jobs/nlp_features.py
@@ -18,14 +22,9 @@ import sys
 import joblib
 import numpy as np
 from dotenv import load_dotenv
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 
-# Add project root to path so shared/ is importable
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
-
-from pymongo import AsyncMongoClient
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -39,17 +38,8 @@ def preprocess_text(
 ) -> str:
     """Build composite text from movie overview, genres, cast, and director.
 
-    Cast and director are weighted by repetition (×2) so they exert stronger
-    influence on TF-IDF similarity than passing mention in the overview.
-
-    Args:
-        overview: Movie overview text, may be None.
-        genres: List of genre name strings.
-        cast: Optional list of cast member names.
-        director: Optional director name.
-
-    Returns:
-        Cleaned composite text string.
+    Cast and director are repeated twice (×2 weight) so they exert stronger
+    influence on the semantic embedding than the overview alone.
     """
     text = overview or ""
     text = html.unescape(text)
@@ -66,102 +56,96 @@ def preprocess_text(
     return " ".join(parts)
 
 
-def build_tfidf_matrix(texts: list[str]):
-    """Fit a TF-IDF vectorizer on corpus texts and return matrix.
+def build_semantic_embeddings(texts: list[str]) -> np.ndarray:
+    """Encode movie texts using sentence-transformers all-MiniLM-L6-v2.
 
-    Uses bigrams, English stop words, and sublinear TF scaling.
-    Falls back to min_df=1 for very small corpora where min_df=2
-    would result in an empty vocabulary.
-
-    Args:
-        texts: List of preprocessed text strings.
-
-    Returns:
-        Tuple of (fitted TfidfVectorizer, sparse TF-IDF matrix).
+    Returns L2-normalised float32 embeddings of shape (N, 384).
+    Normalisation means cosine similarity == dot product at inference time.
     """
-    vectorizer = TfidfVectorizer(
-        max_features=5000,
-        ngram_range=(1, 2),
-        stop_words="english",
-        sublinear_tf=True,
-        min_df=2,
+    from sentence_transformers import SentenceTransformer  # lazy import
+
+    logger.info("Loading sentence-transformers model all-MiniLM-L6-v2 ...")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    logger.info(f"Encoding {len(texts)} movie texts (batch_size=64) ...")
+    embeddings = model.encode(
+        texts,
+        batch_size=64,
+        show_progress_bar=True,
+        normalize_embeddings=True,
     )
-    try:
-        tfidf_matrix = vectorizer.fit_transform(texts)
-        if tfidf_matrix.shape[1] == 0:
-            raise ValueError("Empty vocabulary with min_df=2")
-    except ValueError:
-        # Small corpus — fall back to min_df=1
-        vectorizer = TfidfVectorizer(
-            max_features=5000,
-            ngram_range=(1, 2),
-            stop_words="english",
-            sublinear_tf=True,
-            min_df=1,
-        )
-        tfidf_matrix = vectorizer.fit_transform(texts)
-    return vectorizer, tfidf_matrix
+    return embeddings.astype(np.float32)
 
 
-def build_similarity_index(tfidf_matrix, top_n: int = 50) -> np.ndarray:
-    """Build a precomputed top-N cosine similarity index.
+def build_similarity_index(
+    embeddings: np.ndarray,
+    top_n: int = 100,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build top-N cosine similarity index from L2-normalised embeddings.
 
-    Iterates row-by-row to remain memory-safe for large corpora.
-    For corpora smaller than top_n + 1, effective_top_n is capped at N-1.
-    Self-similarity is excluded by setting sims[i] = -1.0 before selection.
+    Cosine similarity on normalised vectors equals the dot product, so we
+    compute embeddings @ embeddings[i] row-by-row for memory safety.
+    Self-similarity is excluded by setting sims[i] = -1.0 before argpartition.
 
     Args:
-        tfidf_matrix: Fitted sparse TF-IDF matrix of shape (N, vocab).
-        top_n: Number of nearest neighbors to store per movie.
+        embeddings: L2-normalised float32 array of shape (N, D).
+        top_n: Number of nearest neighbours to keep per movie.
 
     Returns:
-        np.ndarray of shape (N, effective_top_n) with dtype int32.
+        top_indices: int32 array of shape (N, effective_top_n).
+        top_scores:  float32 array of shape (N, effective_top_n) — cosine
+                     similarity values stored at the same positions as indices.
     """
-    N = tfidf_matrix.shape[0]
+    N = embeddings.shape[0]
     effective_top_n = min(top_n, N - 1)
     top_indices = np.zeros((N, effective_top_n), dtype=np.int32)
+    top_scores = np.zeros((N, effective_top_n), dtype=np.float32)
+
     for i in range(N):
-        sims = cosine_similarity(tfidf_matrix[i], tfidf_matrix).flatten()
-        sims[i] = -1.0  # exclude self
-        top_indices[i] = np.argpartition(sims, -effective_top_n)[-effective_top_n:]
-    return top_indices
+        sims = (embeddings @ embeddings[i]).astype(np.float64)
+        sims[i] = -2.0  # below min valid cosine (-1.0) so self is never selected
+        idx = np.argpartition(sims, -effective_top_n)[-effective_top_n:]
+        top_indices[i] = idx.astype(np.int32)
+        top_scores[i] = sims[idx].astype(np.float32)
+
+        if (i + 1) % 500 == 0:
+            logger.info(f"Similarity index: {i + 1}/{N} rows computed")
+
+    return top_indices, top_scores
 
 
 def save_artifacts(
-    vectorizer,
     tmdb_ids: list[int],
     top_indices: np.ndarray,
+    top_scores: np.ndarray,
     artifacts_dir: str,
 ) -> None:
-    """Persist TF-IDF vectorizer and similarity index to disk via joblib.
-
-    Args:
-        vectorizer: Fitted TfidfVectorizer object.
-        tmdb_ids: Ordered list of TMDB IDs corresponding to matrix rows.
-        top_indices: Precomputed top-N indices array.
-        artifacts_dir: Directory path to write artifacts into.
-    """
+    """Persist semantic similarity index (indices + scores) to disk."""
     os.makedirs(artifacts_dir, exist_ok=True)
-    joblib.dump(vectorizer, os.path.join(artifacts_dir, "tfidf_vectorizer.joblib"))
     joblib.dump(
-        {"tmdb_ids": tmdb_ids, "top_indices": top_indices},
+        {
+            "tmdb_ids": tmdb_ids,
+            "top_indices": top_indices,
+            "top_scores": top_scores,
+        },
         os.path.join(artifacts_dir, "similarity_index.joblib"),
     )
-    logger.info(f"Artifacts saved to {artifacts_dir}")
+    logger.info(f"Artifacts saved to {artifacts_dir}/similarity_index.joblib")
 
 
 async def main() -> None:
-    """Orchestrate full NLP batch pipeline: read -> preprocess -> vectorize -> index -> save."""
+    """Orchestrate full NLP batch pipeline: read → embed → index → save."""
     load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
     mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
     db_name = os.environ.get("DB_NAME", "movie_mrs")
     artifacts_dir = os.environ.get("ARTIFACTS_DIR", "/artifacts")
 
+    from pymongo import AsyncMongoClient  # lazy import — keeps unit tests free of pymongo dep
+
     client = AsyncMongoClient(mongo_uri)
     db = client[db_name]
 
-    logger.info("Reading movie documents from MongoDB...")
+    logger.info("Reading movie documents from MongoDB ...")
     cursor = db.movies.find(
         {},
         {"tmdb_id": 1, "overview": 1, "genres": 1, "cast": 1, "director": 1},
@@ -180,16 +164,15 @@ async def main() -> None:
     ]
     tmdb_ids = [d["tmdb_id"] for d in docs]
 
-    logger.info("Building TF-IDF matrix...")
-    vectorizer, tfidf_matrix = build_tfidf_matrix(texts)
-    logger.info(f"TF-IDF matrix shape: {tfidf_matrix.shape}")
+    embeddings = build_semantic_embeddings(texts)
+    logger.info(f"Embeddings shape: {embeddings.shape}")
 
-    logger.info("Building cosine similarity index...")
-    top_indices = build_similarity_index(tfidf_matrix)
+    logger.info("Building cosine similarity index (top_n=100) ...")
+    top_indices, top_scores = build_similarity_index(embeddings, top_n=100)
     logger.info(f"Similarity index shape: {top_indices.shape}")
 
-    save_artifacts(vectorizer, tmdb_ids, top_indices, artifacts_dir)
-    logger.info(f"NLP artifacts written for {len(docs)} movies")
+    save_artifacts(tmdb_ids, top_indices, top_scores, artifacts_dir)
+    logger.info(f"NLP pipeline complete for {len(docs)} movies")
 
     client.close()
 

@@ -5,34 +5,61 @@ import pytest
 
 from jobs.evaluate import (
     build_leave_one_out_test_set,
+    compute_mrr,
     compute_ndcg_at_k,
-    precision_at_k,
+    hit_rate_at_k,
+    precision_at_k,  # legacy alias — same function as hit_rate_at_k
     score_from_history,
 )
 
 
 # ---------------------------------------------------------------------------
-# precision_at_k tests
+# hit_rate_at_k tests  (HR@K = Recall@K with 1 relevant item)
 # ---------------------------------------------------------------------------
 
 
-def test_precision_at_k_hit():
+def test_hit_rate_at_k_hit():
     """Returns 1.0 when relevant_id is in top-K of recommended list."""
     recommended = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    assert precision_at_k(recommended, relevant_id=3) == 1.0
+    assert hit_rate_at_k(recommended, relevant_id=3) == 1.0
 
 
-def test_precision_at_k_miss():
+def test_hit_rate_at_k_miss():
     """Returns 0.0 when relevant_id is NOT in top-K."""
     recommended = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-    assert precision_at_k(recommended, relevant_id=99) == 0.0
+    assert hit_rate_at_k(recommended, relevant_id=99) == 0.0
 
 
-def test_precision_at_k_respects_k_boundary():
+def test_hit_rate_at_k_respects_k_boundary():
     """Item at exactly position K is included; item beyond K is excluded."""
     recommended = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-    assert precision_at_k(recommended, relevant_id=10, k=10) == 1.0
-    assert precision_at_k(recommended, relevant_id=11, k=10) == 0.0
+    assert hit_rate_at_k(recommended, relevant_id=10, k=10) == 1.0
+    assert hit_rate_at_k(recommended, relevant_id=11, k=10) == 0.0
+
+
+def test_precision_at_k_alias():
+    """precision_at_k is a legacy alias for hit_rate_at_k — same behaviour."""
+    assert precision_at_k([1, 2, 3], relevant_id=2) == hit_rate_at_k([1, 2, 3], relevant_id=2)
+
+
+# ---------------------------------------------------------------------------
+# compute_mrr tests
+# ---------------------------------------------------------------------------
+
+
+def test_mrr_rank1():
+    """MRR = 1.0 when relevant item is at rank 1."""
+    assert compute_mrr([42, 1, 2, 3], relevant_id=42) == pytest.approx(1.0)
+
+
+def test_mrr_rank2():
+    """MRR = 0.5 when relevant item is at rank 2."""
+    assert compute_mrr([1, 42, 2, 3], relevant_id=42) == pytest.approx(0.5)
+
+
+def test_mrr_miss():
+    """MRR = 0.0 when relevant item is not in top-K."""
+    assert compute_mrr([1, 2, 3], relevant_id=99) == 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -186,12 +213,41 @@ def _make_nlp_data(tmdb_ids: list[int], neighbors: dict[int, list[int]]) -> dict
 
 
 def test_score_from_history_returns_candidates():
-    """Neighbors of training movies appear in candidate scores."""
-    # Movies 1,2 are training; their neighbors are 3,4,5
+    """Neighbors of training movies appear in candidate scores.
+
+    Without top_scores (old artifact format), frequency count is used:
+    movie 4 is neighbor of both training movies so its score is doubled.
+    """
     nlp = _make_nlp_data([1, 2, 3, 4, 5], {1: [3, 4], 2: [4, 5]})
     scores = score_from_history([1, 2], nlp, cf_data=None)
     assert set(scores.keys()) == {3, 4, 5}
-    assert scores[4] > scores[3]  # movie 4 is neighbor of both → higher score
+    assert scores[4] > scores[3]  # movie 4 appears in both neighbourhoods
+
+
+def test_score_from_history_uses_top_scores_when_available():
+    """When top_scores are provided, weighted cosine sum is used instead of counts."""
+    import numpy as np
+
+    tmdb_ids = [1, 2, 3, 4, 5]
+    id_to_idx = {tid: i for i, tid in enumerate(tmdb_ids)}
+    # movie 1 → neighbors [3, 4]; movie 2 → neighbors [4, 5]
+    top_indices = np.array(
+        [[id_to_idx[3], id_to_idx[4]], [id_to_idx[4], id_to_idx[5]], [], [], []],
+        dtype=object,
+    )
+    # Scores: 1→3 similarity=0.9, 1→4 similarity=0.1; 2→4 similarity=0.8, 2→5 similarity=0.5
+    top_scores = np.array(
+        [[0.9, 0.1], [0.8, 0.5], [], [], []],
+        dtype=object,
+    )
+    nlp = {"tmdb_ids": tmdb_ids, "top_indices": top_indices, "top_scores": top_scores}
+    scores = score_from_history([1, 2], nlp, cf_data=None)
+    # movie 4: 0.1 (from 1) + 0.8 (from 2) = 0.9
+    # movie 3: 0.9 (from 1 only)
+    # movie 5: 0.5 (from 2 only)
+    assert abs(scores[4] - 0.9) < 1e-5
+    assert abs(scores[3] - 0.9) < 1e-5
+    assert abs(scores[5] - 0.5) < 1e-5
 
 
 def test_score_from_history_unknown_training_ids_ignored():

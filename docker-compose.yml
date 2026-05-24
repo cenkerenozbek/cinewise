@@ -33,6 +33,9 @@ services:
   worker:
     build: ./worker
     env_file: .env
+    environment:
+      - TMDB_TARGET_COUNT=20000
+      - SEED_USER_LIMIT=2000
     depends_on:
       - mongo
     volumes:
