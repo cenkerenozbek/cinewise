@@ -16,7 +16,10 @@ export function useFeedback() {
       await api.post('/feedback', payload);
     },
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+      // Sadece history ve watchlist cache'ini güncelle;
+      // recommendations kasıtlı olarak yenilenmez — kullanıcı sayfayı
+      // yenileyene veya tercihleri değiştirene kadar liste değişmemeli.
+      void queryClient.invalidateQueries({ queryKey: ['history'] });
     },
   });
 }

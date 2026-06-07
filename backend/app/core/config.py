@@ -8,8 +8,8 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "change_me_in_production"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
-    CF_THRESHOLD: int = 5
-    CF_ALPHA: float = 0.5
+    CF_THRESHOLD: int = 3
+    CF_ALPHA: float = 0.35
 
     model_config = {
         "env_file": "../.env",

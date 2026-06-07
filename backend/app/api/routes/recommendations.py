@@ -35,7 +35,7 @@ async def _get_optional_user(request: Request) -> str | None:
 
 
 @router.post("", response_model=RecommendationResponse)
-@limiter.limit("10/minute")
+@limiter.limit("60/minute")
 async def get_recommendations(
     request: Request,
     response: Response,

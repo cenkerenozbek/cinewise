@@ -1,12 +1,16 @@
-"""Tests for rate limiting on POST /api/recommendations — Phase 3 Plan 01.
+"""Tests for rate limiting on POST /api/recommendations.
 
 Covers:
-- SEC-03: The 11th recommendation request within 1 minute from the same user returns 429
+- SEC-03: The (limit+1)th recommendation request within 1 minute returns 429
 - 429 response includes Retry-After header
+
+Production limit is 60/minute; tests exhaust it via 61 in-memory ASGI calls.
 """
 import pytest
 
 from app.core.security import create_access_token
+
+_LIMIT = 60  # must match @limiter.limit("60/minute") in recommendations.py
 
 
 # ---------------------------------------------------------------------------
@@ -14,14 +18,14 @@ from app.core.security import create_access_token
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_rate_limit_429_after_10(client_with_nlp, seed_movies):
-    """First 10 POST /api/recommendations return 200; the 11th returns 429."""
-    token = create_access_token("ratelimituser")
+async def test_rate_limit_429_after_60(client_with_nlp, seed_movies):
+    """First 60 POSTs return 200; the 61st returns 429."""
+    token = create_access_token("ratelimituser60")
     headers = {"Authorization": f"Bearer {token}"}
     payload = {"genres": ["Action"]}
 
     statuses = []
-    for _ in range(11):
+    for _ in range(_LIMIT + 1):
         response = await client_with_nlp.post(
             "/api/recommendations",
             json=payload,
@@ -29,21 +33,21 @@ async def test_rate_limit_429_after_10(client_with_nlp, seed_movies):
         )
         statuses.append(response.status_code)
 
-    # First 10 must be 200
-    assert statuses[:10] == [200] * 10, f"Expected first 10 to be 200, got: {statuses[:10]}"
-    # 11th must be 429
-    assert statuses[10] == 429, f"Expected 11th to be 429, got: {statuses[10]}"
+    assert statuses[:_LIMIT] == [200] * _LIMIT, (
+        f"Expected first {_LIMIT} to be 200, got: {statuses[:_LIMIT]}"
+    )
+    assert statuses[_LIMIT] == 429, f"Expected request {_LIMIT + 1} to be 429, got: {statuses[_LIMIT]}"
 
 
 @pytest.mark.asyncio
 async def test_rate_limit_includes_retry_after(client_with_nlp, seed_movies):
     """429 response from exceeded rate limit includes a Retry-After header."""
-    token = create_access_token("retryafteruser")
+    token = create_access_token("retryafteruser60")
     headers = {"Authorization": f"Bearer {token}"}
     payload = {"genres": ["Action"]}
 
     last_response = None
-    for _ in range(11):
+    for _ in range(_LIMIT + 1):
         last_response = await client_with_nlp.post(
             "/api/recommendations",
             json=payload,
@@ -52,7 +56,6 @@ async def test_rate_limit_includes_retry_after(client_with_nlp, seed_movies):
 
     assert last_response is not None
     assert last_response.status_code == 429
-    # Header name is case-insensitive in HTTP
     header_names_lower = {k.lower() for k in last_response.headers}
     assert "retry-after" in header_names_lower, (
         f"Expected 'retry-after' in response headers, got: {dict(last_response.headers)}"

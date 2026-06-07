@@ -84,14 +84,17 @@ def _apply_interaction_content_feedback(
 
 
 MOOD_GENRE_MAP = {
-    "Tense": ["Thriller", "Horror"],
+    "Tense": ["Thriller", "Horror", "Crime"],
     "Romantic": ["Romance", "Drama"],
-    "Happy": ["Comedy", "Animation"],
-    "Relaxing": ["Documentary", "Drama"],
-    "Mind-bending": ["Science Fiction", "Mystery"],
+    "Happy": ["Comedy", "Animation", "Family"],
+    "Relaxing": ["Documentary", "Drama", "Music"],
+    "Mind-bending": ["Science Fiction", "Mystery", "Fantasy"],
 }
-MOOD_BOOST = 1.3
+MOOD_BOOST = 1.6
 TOP_K = 10
+# Max genre-seed movies: only use high-quality films as seeds to reduce noise
+_SEED_LIMIT = 300
+_SEED_MIN_VOTES = 50
 
 
 def _get_completion_weight(completion: float | None) -> float:
@@ -147,12 +150,29 @@ class RecommendationService:
         top_scores = getattr(self._state, "top_scores", None)
         id_to_idx = {tid: i for i, tid in enumerate(tmdb_ids)}
 
-        # Find seed movies matching user's genre preferences
-        cursor = self._db.movies.find(
-            {"genres": {"$in": genres}},
-            {"tmdb_id": 1, "genres": 1},
+        # Find seed movies matching user's genre preferences.
+        # Prefer popular films (vote_count threshold) to reduce noise; fall back
+        # to all genre matches if the filtered result set is too small.
+        cursor = (
+            self._db.movies.find(
+                {"genres": {"$in": genres}, "vote_count": {"$gte": _SEED_MIN_VOTES}},
+                {"tmdb_id": 1, "genres": 1},
+            )
+            .sort("rating", -1)
+            .limit(_SEED_LIMIT)
         )
         genre_docs = await cursor.to_list(length=None)
+        if len(genre_docs) < 10:
+            # Fallback: no vote_count filter (e.g. test env or sparse catalogue)
+            cursor = (
+                self._db.movies.find(
+                    {"genres": {"$in": genres}},
+                    {"tmdb_id": 1, "genres": 1},
+                )
+                .sort("rating", -1)
+                .limit(_SEED_LIMIT)
+            )
+            genre_docs = await cursor.to_list(length=None)
 
         # Cold-start fallback: no genre-matching movies → return top-rated
         if not genre_docs:
@@ -225,17 +245,18 @@ class RecommendationService:
                 if ia.get("watch_completion") is not None
             }
 
-            base_feedback_weight = max(5.0, min(30.0, len(genre_docs) / 20.0))
-            id_to_idx_feedback = {tid: i for i, tid in enumerate(tmdb_ids)}
-
-            # Apply per-movie completion-weighted content feedback
+            # --- Direct history seeding (aligns with offline evaluation) ---
+            # Liked movies are used as additional high-weight seeds on top of
+            # the genre-pool seeds. This is the same logic evaluate.py uses,
+            # so production quality matches the measured metrics.
+            history_weight = max(15.0, min(60.0, len(genre_docs) / 10.0))
             for liked_id in liked_movie_ids:
-                liked_idx = id_to_idx_feedback.get(liked_id)
+                liked_idx = id_to_idx.get(liked_id)
                 if liked_idx is None:
                     continue
                 completion = completion_map.get(liked_id)
-                weight = base_feedback_weight * _get_completion_weight(completion)
-                if weight == 0:
+                weight = history_weight * _get_completion_weight(completion)
+                if weight <= 0:
                     continue
                 for j, neighbor_idx in enumerate(top_indices[liked_idx]):
                     neighbor_id = tmdb_ids[int(neighbor_idx)]
@@ -245,14 +266,14 @@ class RecommendationService:
                     )
 
             for disliked_id in disliked_movie_ids:
-                disliked_idx = id_to_idx_feedback.get(disliked_id)
+                disliked_idx = id_to_idx.get(disliked_id)
                 if disliked_idx is None:
                     continue
                 for j, neighbor_idx in enumerate(top_indices[disliked_idx]):
                     neighbor_id = tmdb_ids[int(neighbor_idx)]
                     if neighbor_id in candidate_scores:
                         sim = float(top_scores[disliked_idx][j]) if top_scores is not None else 1.0
-                        candidate_scores[neighbor_id] -= base_feedback_weight * sim
+                        candidate_scores[neighbor_id] -= history_weight * sim
 
             if self._state.cf_top_indices is not None:
                 alpha = _get_alpha(
