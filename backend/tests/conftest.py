@@ -124,6 +124,7 @@ async def client(test_db):
     # Set NLP artifacts to None by default (tests that need them will override)
     app.state.tfidf_vectorizer = None
     app.state.tmdb_ids = []
+    app.state.movie_embeddings = None
     app.state.top_indices = None
     app.state.top_scores = None
     # CF artifacts — disabled by default
@@ -167,6 +168,7 @@ async def client_with_hybrid(test_db):
     app.state.db = test_db
     app.state.tfidf_vectorizer = None
     app.state.tmdb_ids = tmdb_ids
+    app.state.movie_embeddings = None
     app.state.top_indices = top_indices
     app.state.top_scores = None
     app.state.cf_top_indices = cf_top_indices
@@ -259,6 +261,7 @@ async def client_with_nlp(test_db):
     app.state.db = test_db
     app.state.tfidf_vectorizer = None
     app.state.tmdb_ids = tmdb_ids
+    app.state.movie_embeddings = None
     app.state.top_indices = top_indices
     app.state.top_scores = None
     # CF artifacts — disabled by default

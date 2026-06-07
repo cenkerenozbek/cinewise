@@ -117,15 +117,18 @@ def test_save_artifacts(tmp_path):
     embeddings = _random_embeddings(6, dim=16)
     tmdb_ids = list(range(100, 106))
     indices, scores = build_similarity_index(embeddings, top_n=5)
-    save_artifacts(tmdb_ids, indices, scores, str(tmp_path))
+    save_artifacts(tmdb_ids, embeddings, indices, scores, str(tmp_path))
 
     index_path = tmp_path / "similarity_index.joblib"
     assert index_path.exists(), "similarity_index.joblib not found"
 
     loaded = joblib.load(index_path)
     assert "tmdb_ids" in loaded
+    assert "embeddings" in loaded
     assert "top_indices" in loaded
     assert "top_scores" in loaded
     assert loaded["tmdb_ids"] == tmdb_ids
+    assert loaded["embeddings"].shape == embeddings.shape
+    assert loaded["embeddings"].dtype == np.float32
     assert loaded["top_indices"].shape == indices.shape
     assert loaded["top_scores"].shape == scores.shape

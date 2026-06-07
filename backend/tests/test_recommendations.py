@@ -19,6 +19,40 @@ from app.services.recommendation_service import (
 )
 
 
+_GENRE_TEST_VECTORS = {
+    "Action": np.array([1.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+    "Adventure": np.array([0.8, 0.0, 0.0, 0.0, 0.2, 0.0], dtype=np.float32),
+    "Thriller": np.array([0.5, 0.0, 0.0, 0.8, 0.0, 0.0], dtype=np.float32),
+    "Crime": np.array([0.4, 0.0, 0.0, 0.8, 0.0, 0.0], dtype=np.float32),
+    "Horror": np.array([0.0, 0.0, 0.0, 1.0, 0.0, 0.0], dtype=np.float32),
+    "Romance": np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32),
+    "Comedy": np.array([0.0, 0.8, 0.0, 0.0, 0.0, 0.2], dtype=np.float32),
+    "Drama": np.array([0.0, 0.4, 0.6, 0.0, 0.0, 0.0], dtype=np.float32),
+    "Documentary": np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0], dtype=np.float32),
+    "Science Fiction": np.array([0.0, 0.0, 0.0, 0.0, 1.0, 0.0], dtype=np.float32),
+    "Mystery": np.array([0.0, 0.0, 0.0, 0.4, 0.8, 0.0], dtype=np.float32),
+    "Animation": np.array([0.0, 0.4, 0.0, 0.0, 0.0, 1.0], dtype=np.float32),
+    "Family": np.array([0.0, 0.4, 0.0, 0.0, 0.0, 0.8], dtype=np.float32),
+}
+
+
+def _install_genre_test_embeddings(state, docs: list[dict]) -> None:
+    docs_by_id = {doc["tmdb_id"]: doc for doc in docs}
+    embeddings = []
+    for tmdb_id in state.tmdb_ids:
+        doc = docs_by_id[tmdb_id]
+        vec = np.zeros(6, dtype=np.float32)
+        for genre in doc.get("genres", []):
+            vec += _GENRE_TEST_VECTORS.get(genre, np.zeros(6, dtype=np.float32))
+        norm = np.linalg.norm(vec)
+        if norm == 0.0:
+            vec[0] = 1.0
+        else:
+            vec /= norm
+        embeddings.append(vec)
+    state.movie_embeddings = np.array(embeddings, dtype=np.float32)
+
+
 # ---------------------------------------------------------------------------
 # Task 1 — service / explanation tests (no HTTP client needed)
 # ---------------------------------------------------------------------------
@@ -77,6 +111,66 @@ async def test_different_genres_differ(client_with_nlp, seed_movies):
     ids_action = {r.tmdb_id for r in result_action.recommendations}
     ids_romance = {r.tmdb_id for r in result_romance.recommendations}
     assert ids_action != ids_romance
+
+
+@pytest.mark.asyncio
+async def test_embedding_query_tracks_updated_preferences(client_with_nlp, seed_movies):
+    """Runtime preference embedding makes changed genre chips produce matching recs."""
+    from app.main import app
+    db = app.state.db
+    state = app.state
+    _install_genre_test_embeddings(state, seed_movies)
+
+    service = RecommendationService(db, state)
+    result_documentary = await service.get_recommendations(
+        ["Documentary"],
+        "Relaxing",
+        user_id=None,
+    )
+    result_horror = await service.get_recommendations(["Horror"], None, user_id=None)
+
+    documentary_ids = [r.tmdb_id for r in result_documentary.recommendations]
+    horror_ids = [r.tmdb_id for r in result_horror.recommendations]
+
+    assert "Documentary" in result_documentary.recommendations[0].genres
+    assert "Horror" in result_horror.recommendations[0].genres
+    assert documentary_ids != horror_ids
+
+
+@pytest.mark.asyncio
+async def test_history_reranks_but_does_not_override_active_genres(
+    client_with_nlp,
+    seed_movies,
+    test_db,
+):
+    """Profile/history can rerank, but active genre chips constrain the result pool."""
+    from app.main import app
+    db = app.state.db
+    state = app.state
+    _install_genre_test_embeddings(state, seed_movies)
+
+    await test_db.interactions.update_one(
+        {"user_id": "genre-constraint-user", "movie_id": 107},
+        {
+            "$set": {
+                "user_id": "genre-constraint-user",
+                "movie_id": 107,
+                "action": "like",
+            }
+        },
+        upsert=True,
+    )
+
+    selected = {"Action", "Romance", "Comedy", "Drama"}
+    service = RecommendationService(db, state)
+    result = await service.get_recommendations(
+        sorted(selected),
+        None,
+        user_id="genre-constraint-user",
+    )
+
+    assert len(result.recommendations) == 10
+    assert all(set(item.genres) & selected for item in result.recommendations)
 
 
 # --- REC-05: Cold-start handling ---

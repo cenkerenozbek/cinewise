@@ -6,11 +6,12 @@ export function useRecommendations(
   genres: string[],
   mood: string | null,
   authCacheKey = 'anonymous',
+  revision = 0,
 ) {
   const queryClient = useQueryClient();
 
   return useQuery<RecommendationResponse>({
-    queryKey: ['recommendations', genres, mood, authCacheKey],
+    queryKey: ['recommendations', genres, mood, authCacheKey, revision],
     queryFn: async () => {
       const { data } = await api.post<RecommendationResponse>('/recommendations', {
         genres,
@@ -22,7 +23,7 @@ export function useRecommendations(
       return data;
     },
     enabled: genres.length > 0,
-    staleTime: 3 * 60 * 1000,
+    staleTime: 0,
   });
 }
 
@@ -53,8 +54,6 @@ export function useSaveUserPreferences(authCacheKey = 'anonymous') {
     onSuccess: (preferences) => {
       queryClient.setQueryData(['userPreferences', authCacheKey], preferences);
       void queryClient.invalidateQueries({ queryKey: ['userPreferences', authCacheKey] });
-      // Preferences changed → cached recommendations are stale, force fresh fetch
-      void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
     },
   });
 }

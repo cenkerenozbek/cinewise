@@ -115,15 +115,17 @@ def build_similarity_index(
 
 def save_artifacts(
     tmdb_ids: list[int],
+    embeddings: np.ndarray,
     top_indices: np.ndarray,
     top_scores: np.ndarray,
     artifacts_dir: str,
 ) -> None:
-    """Persist semantic similarity index (indices + scores) to disk."""
+    """Persist semantic embeddings and similarity index to disk."""
     os.makedirs(artifacts_dir, exist_ok=True)
     joblib.dump(
         {
             "tmdb_ids": tmdb_ids,
+            "embeddings": embeddings.astype(np.float32),
             "top_indices": top_indices,
             "top_scores": top_scores,
         },
@@ -171,7 +173,7 @@ async def main() -> None:
     top_indices, top_scores = build_similarity_index(embeddings, top_n=100)
     logger.info(f"Similarity index shape: {top_indices.shape}")
 
-    save_artifacts(tmdb_ids, top_indices, top_scores, artifacts_dir)
+    save_artifacts(tmdb_ids, embeddings, top_indices, top_scores, artifacts_dir)
     logger.info(f"NLP pipeline complete for {len(docs)} movies")
 
     client.close()

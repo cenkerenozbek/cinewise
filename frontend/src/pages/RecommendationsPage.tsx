@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
 import { isAxiosError } from 'axios';
-import { useQueryClient } from '@tanstack/react-query';
 import {
   useRecommendations,
   useSaveUserPreferences,
@@ -263,8 +262,8 @@ export function RecommendationsPage() {
   const [showForm, setShowForm] = useState(false);
   const [showValidationError, setShowValidationError] = useState(false);
   const [votes, setVotes] = useState<Map<number, FeedbackAction>>(new Map());
+  const [recommendationRevision, setRecommendationRevision] = useState(0);
   const sidebarDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const queryClient = useQueryClient();
   const { mutate: submitFeedback } = useFeedback();
   const { mutate: savePreferences, isPending: isSavingPreferences } =
     useSaveUserPreferences(authCacheKey);
@@ -287,24 +286,22 @@ export function RecommendationsPage() {
     activePrefs?.genres ?? [],
     activePrefs?.mood ?? null,
     authCacheKey,
+    recommendationRevision,
   );
 
   function handleGenreToggle(genre: string) {
-    setDraftPrefs((prev) => {
-      const baseGenres = prev?.genres ?? selectedGenres;
-      const nextGenres = baseGenres.includes(genre)
-        ? baseGenres.filter((g) => g !== genre)
-        : [...baseGenres, genre];
-      return { genres: nextGenres, mood: prev?.mood ?? selectedMood };
-    });
+    const baseGenres = draftPrefs?.genres ?? selectedGenres;
+    const nextGenres = baseGenres.includes(genre)
+      ? baseGenres.filter((g) => g !== genre)
+      : [...baseGenres, genre];
+    const mood = draftPrefs?.mood ?? selectedMood;
+    setDraftPrefs({ genres: nextGenres, mood });
     setShowValidationError(false);
   }
 
   function handleMoodSelect(mood: string | null) {
-    setDraftPrefs((prev) => ({
-      genres: prev?.genres ?? selectedGenres,
-      mood,
-    }));
+    const genres = draftPrefs?.genres ?? selectedGenres;
+    setDraftPrefs({ genres, mood });
   }
 
   function handleSubmit() {
@@ -316,23 +313,23 @@ export function RecommendationsPage() {
     setShowValidationError(false);
     setSubmittedPrefs(nextPrefs);
     setDraftPrefs(nextPrefs);
-    // Invalidate cached recs immediately so the new prefs always fetch fresh,
-    // even if the same genre+mood combo was recently cached.
-    void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
+    setRecommendationRevision((revision) => revision + 1);
     savePreferences(nextPrefs);
     setShowForm(false);
     setActiveMood(selectedMood);
   }
 
   function handleSidebarMoodSelect(mood: string | null) {
-    // Theme changes instantly
     setActiveMood(mood);
-    const genres = selectedGenres.length > 0 ? selectedGenres : (activePrefs?.genres ?? []);
+    const genres = activePrefs?.genres ?? [];
     const nextPrefs = { genres, mood };
     setDraftPrefs(nextPrefs);
-
-    // Debounce the actual refetch by 600ms so rapid mood switching
-    // doesn't fire multiple API requests and hit the rate limiter
+    // Update recs immediately (sidebar mood change is already intentional)
+    if (genres.length > 0) {
+      setSubmittedPrefs(nextPrefs);
+      setRecommendationRevision((revision) => revision + 1);
+    }
+    // Debounce the backend save so rapid switching doesn't spam the API
     if (sidebarDebounceRef.current) clearTimeout(sidebarDebounceRef.current);
     sidebarDebounceRef.current = setTimeout(() => {
       if (nextPrefs.genres.length > 0) {

@@ -2,6 +2,7 @@
 import logging
 import math
 
+import numpy as np
 from fastapi import HTTPException
 
 from app.core.config import settings
@@ -9,7 +10,7 @@ from app.models.recommendation import RecommendationItem, RecommendationResponse
 from app.repositories.interactions_repo import InteractionsRepository
 from app.repositories.user_preferences_repo import UserPreferencesRepository
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 def _norm(scores: dict) -> dict:
@@ -95,6 +96,9 @@ TOP_K = 10
 # Max genre-seed movies: only use high-quality films as seeds to reduce noise
 _SEED_LIMIT = 300
 _SEED_MIN_VOTES = 50
+_GENRE_MATCH_BOOST = 0.55
+_MOOD_MATCH_BOOST = 0.25
+_HISTORY_SIGNAL_WEIGHT = 0.45
 
 
 def _get_completion_weight(completion: float | None) -> float:
@@ -125,6 +129,121 @@ def build_explanation(genres: list[str], mood: str | None) -> str:
     return f"Recommended because you like {genre_part}."
 
 
+def _normalised_movie_embeddings(movie_embeddings, expected_rows: int) -> np.ndarray | None:
+    """Return a safe, L2-normalised movie embedding matrix when available."""
+    if movie_embeddings is None:
+        return None
+    embeddings = np.asarray(movie_embeddings, dtype=np.float32)
+    if embeddings.ndim != 2 or embeddings.shape[0] != expected_rows:
+        logger.warning(
+            "Ignoring movie_embeddings artifact with shape %s for %s tmdb ids",
+            getattr(embeddings, "shape", None),
+            expected_rows,
+        )
+        return None
+    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+    norms[norms == 0.0] = 1.0
+    return embeddings / norms
+
+
+def _quality_weight(doc: dict) -> float:
+    """Small tie-breaker weight so better-rated seed movies shape the query a bit more."""
+    rating = doc.get("rating")
+    if not isinstance(rating, int | float):
+        return 1.0
+    return 1.0 + max(0.0, min((float(rating) - 6.0) / 10.0, 0.25))
+
+
+def _ranking_quality_boost(doc: dict) -> float:
+    """Small ranking boost for stronger catalogue signals within the active genre pool."""
+    rating = doc.get("rating")
+    vote_count = doc.get("vote_count") or 0
+
+    rating_boost = 0.0
+    if isinstance(rating, int | float) and rating > 0:
+        rating_boost = max(0.0, min((float(rating) - 5.5) / 10.0, 0.18))
+
+    vote_boost = 0.0
+    if isinstance(vote_count, int | float) and vote_count > 0:
+        vote_boost = min(math.log1p(float(vote_count)) / math.log1p(10000.0), 1.0) * 0.12
+
+    return rating_boost + vote_boost
+
+
+def _build_preference_vector(
+    docs: list[dict],
+    genres: list[str],
+    mood: str | None,
+    id_to_idx: dict[int, int],
+    movie_embeddings: np.ndarray,
+) -> np.ndarray | None:
+    """Build a runtime preference embedding from selected genres and mood."""
+    selected_genres = set(genres)
+    mood_genres = set(MOOD_GENRE_MAP.get(mood, [])) if mood else set()
+    query = np.zeros(movie_embeddings.shape[1], dtype=np.float32)
+    total_weight = 0.0
+
+    for doc in docs:
+        idx = id_to_idx.get(doc.get("tmdb_id"))
+        if idx is None:
+            continue
+        doc_genres = set(doc.get("genres", []))
+        genre_matches = len(doc_genres & selected_genres)
+        mood_matches = len(doc_genres & mood_genres)
+        weight = float(genre_matches) + 0.75 * float(mood_matches)
+        if weight <= 0.0:
+            continue
+        weight *= _quality_weight(doc)
+        query += movie_embeddings[idx] * weight
+        total_weight += weight
+
+    if total_weight <= 0.0:
+        return None
+
+    query /= total_weight
+    norm = float(np.linalg.norm(query))
+    if norm <= 0.0:
+        return None
+    return query / norm
+
+
+def _score_with_preference_embedding(
+    query_docs: list[dict],
+    candidate_docs: list[dict],
+    genres: list[str],
+    mood: str | None,
+    id_to_idx: dict[int, int],
+    movie_embeddings: np.ndarray,
+) -> dict[int, float]:
+    """Score candidate movies against the current genre/mood preference vector."""
+    query = _build_preference_vector(query_docs, genres, mood, id_to_idx, movie_embeddings)
+    if query is None:
+        return {}
+
+    selected_genres = set(genres)
+    mood_genres = set(MOOD_GENRE_MAP.get(mood, [])) if mood else set()
+    semantic_scores = movie_embeddings @ query
+    candidate_scores: dict[int, float] = {}
+
+    for doc in candidate_docs:
+        tmdb_id = doc.get("tmdb_id")
+        idx = id_to_idx.get(tmdb_id)
+        if idx is None:
+            continue
+
+        doc_genres = set(doc.get("genres", []))
+        genre_matches = len(doc_genres & selected_genres)
+        mood_matches = len(doc_genres & mood_genres)
+        score = float(semantic_scores[idx])
+        score += _GENRE_MATCH_BOOST * min(genre_matches, 3)
+        score += _MOOD_MATCH_BOOST * min(mood_matches, 2)
+        score += _ranking_quality_boost(doc)
+
+        candidate_scores[int(tmdb_id)] = score
+
+    return candidate_scores
+
+
 class RecommendationService:
     """Generates top-K recommendations using precomputed similarity index."""
 
@@ -139,40 +258,76 @@ class RecommendationService:
         mood: str | None,
         user_id: str | None = None,
     ) -> RecommendationResponse:
-        if self._state.top_indices is None:
+        tmdb_ids = list(getattr(self._state, "tmdb_ids", []))
+        top_indices = getattr(self._state, "top_indices", None)
+        top_scores = getattr(self._state, "top_scores", None)
+        movie_embeddings = _normalised_movie_embeddings(
+            getattr(self._state, "movie_embeddings", None),
+            len(tmdb_ids),
+        )
+        if top_indices is None and movie_embeddings is None:
             raise HTTPException(503, "Recommendation engine not ready — run NLP pipeline first")
 
         if user_id:
             await self._prefs_repo.upsert(user_id, genres, mood)
 
-        tmdb_ids = self._state.tmdb_ids
-        top_indices = self._state.top_indices
-        top_scores = getattr(self._state, "top_scores", None)
         id_to_idx = {tid: i for i, tid in enumerate(tmdb_ids)}
+
+        catalog_cursor = self._db.movies.find(
+            {"tmdb_id": {"$in": tmdb_ids}},
+            {"tmdb_id": 1, "genres": 1, "rating": 1, "vote_count": 1},
+        )
+        catalog_docs = await catalog_cursor.to_list(length=None)
 
         # Find seed movies matching user's genre preferences.
         # Prefer popular films (vote_count threshold) to reduce noise; fall back
         # to all genre matches if the filtered result set is too small.
-        cursor = (
-            self._db.movies.find(
-                {"genres": {"$in": genres}, "vote_count": {"$gte": _SEED_MIN_VOTES}},
-                {"tmdb_id": 1, "genres": 1},
+        selected_genres = set(genres)
+        matching_docs = [
+            doc for doc in catalog_docs if set(doc.get("genres", [])) & selected_genres
+        ]
+        popular_matches = [
+            doc for doc in matching_docs if (doc.get("vote_count") or 0) >= _SEED_MIN_VOTES
+        ]
+        seed_source = popular_matches if len(popular_matches) >= 10 else matching_docs
+        genre_docs = sorted(
+            seed_source,
+            key=lambda d: (
+                d.get("rating") if isinstance(d.get("rating"), int | float) else 0.0,
+                d.get("vote_count") or 0,
+            ),
+            reverse=True,
+        )[:_SEED_LIMIT]
+        # Explicit genre/mood selections define the candidate pool. Profile and
+        # feedback signals may rerank this pool, but should not pull the list
+        # away from the user's current genre intent. Tiny catalogues/tests fall
+        # back to the whole catalogue so the API can still fill a top-10 list.
+        candidate_docs = matching_docs if len(matching_docs) >= TOP_K else catalog_docs
+        allowed_candidate_ids = {int(doc["tmdb_id"]) for doc in candidate_docs}
+
+        if not catalog_docs:
+            logger.warning("No catalogue docs match NLP artifact ids — falling back to top-rated")
+            fallback_cursor = (
+                self._db.movies.find({"rating": {"$ne": None}}).sort("rating", -1).limit(TOP_K)
             )
-            .sort("rating", -1)
-            .limit(_SEED_LIMIT)
-        )
-        genre_docs = await cursor.to_list(length=None)
-        if len(genre_docs) < 10:
-            # Fallback: no vote_count filter (e.g. test env or sparse catalogue)
-            cursor = (
-                self._db.movies.find(
-                    {"genres": {"$in": genres}},
-                    {"tmdb_id": 1, "genres": 1},
-                )
-                .sort("rating", -1)
-                .limit(_SEED_LIMIT)
+            fallback_docs = await fallback_cursor.to_list(length=None)
+            explanation = build_explanation(genres, mood)
+            return RecommendationResponse(
+                recommendations=[
+                    RecommendationItem(
+                        tmdb_id=d["tmdb_id"],
+                        title=d.get("title", ""),
+                        title_tr=d.get("title_tr"),
+                        year=d.get("year"),
+                        genres=d.get("genres", []),
+                        poster_path=d.get("poster_path"),
+                        rating=d.get("rating"),
+                        overview=d.get("overview"),
+                        explanation=explanation,
+                    )
+                    for d in fallback_docs
+                ]
             )
-            genre_docs = await cursor.to_list(length=None)
 
         # Cold-start fallback: no genre-matching movies → return top-rated
         if not genre_docs:
@@ -199,16 +354,29 @@ class RecommendationService:
                 ]
             )
 
-        # Score candidates using weighted cosine similarity accumulation
         candidate_scores: dict[int, float] = {}
-        for doc in genre_docs:
-            idx = id_to_idx.get(doc["tmdb_id"])
-            if idx is None:
-                continue
-            for j, neighbor_idx in enumerate(top_indices[idx]):
-                neighbor_id = tmdb_ids[int(neighbor_idx)]
-                sim = float(top_scores[idx][j]) if top_scores is not None else 1.0
-                candidate_scores[neighbor_id] = candidate_scores.get(neighbor_id, 0.0) + sim
+        if movie_embeddings is not None:
+            candidate_scores = _score_with_preference_embedding(
+                genre_docs,
+                candidate_docs,
+                genres,
+                mood,
+                id_to_idx,
+                movie_embeddings,
+            )
+
+        # Backward-compatible path for old artifacts that do not include embeddings.
+        if not candidate_scores and top_indices is not None:
+            for doc in genre_docs:
+                idx = id_to_idx.get(doc["tmdb_id"])
+                if idx is None:
+                    continue
+                for j, neighbor_idx in enumerate(top_indices[idx]):
+                    neighbor_id = tmdb_ids[int(neighbor_idx)]
+                    if neighbor_id not in allowed_candidate_ids:
+                        continue
+                    sim = float(top_scores[idx][j]) if top_scores is not None else 1.0
+                    candidate_scores[neighbor_id] = candidate_scores.get(neighbor_id, 0.0) + sim
 
         # Apply mood boost
         if mood and mood in MOOD_GENRE_MAP:
@@ -245,42 +413,57 @@ class RecommendationService:
                 if ia.get("watch_completion") is not None
             }
 
-            # --- Direct history seeding (aligns with offline evaluation) ---
-            # Liked movies are used as additional high-weight seeds on top of
-            # the genre-pool seeds. This is the same logic evaluate.py uses,
-            # so production quality matches the measured metrics.
-            history_weight = max(15.0, min(60.0, len(genre_docs) / 10.0))
-            for liked_id in liked_movie_ids:
-                liked_idx = id_to_idx.get(liked_id)
-                if liked_idx is None:
-                    continue
-                completion = completion_map.get(liked_id)
-                weight = history_weight * _get_completion_weight(completion)
-                if weight <= 0:
-                    continue
-                for j, neighbor_idx in enumerate(top_indices[liked_idx]):
-                    neighbor_id = tmdb_ids[int(neighbor_idx)]
-                    sim = float(top_scores[liked_idx][j]) if top_scores is not None else 1.0
-                    candidate_scores[neighbor_id] = (
-                        candidate_scores.get(neighbor_id, 0.0) + weight * sim
-                    )
+            # History reranks the active genre/mood pool; it must not dominate
+            # the current explicit request or make recommendations feel fixed.
+            history_weight = _HISTORY_SIGNAL_WEIGHT
+            if top_indices is not None:
+                history_scores: dict[int, float] = {}
+                for liked_id in liked_movie_ids:
+                    liked_idx = id_to_idx.get(liked_id)
+                    if liked_idx is None:
+                        continue
+                    completion = completion_map.get(liked_id)
+                    weight = history_weight * _get_completion_weight(completion)
+                    if weight <= 0:
+                        continue
+                    for j, neighbor_idx in enumerate(top_indices[liked_idx]):
+                        neighbor_id = tmdb_ids[int(neighbor_idx)]
+                        if neighbor_id not in candidate_scores:
+                            continue
+                        sim = float(top_scores[liked_idx][j]) if top_scores is not None else 1.0
+                        history_scores[neighbor_id] = (
+                            history_scores.get(neighbor_id, 0.0) + weight * sim
+                        )
 
-            for disliked_id in disliked_movie_ids:
-                disliked_idx = id_to_idx.get(disliked_id)
-                if disliked_idx is None:
-                    continue
-                for j, neighbor_idx in enumerate(top_indices[disliked_idx]):
-                    neighbor_id = tmdb_ids[int(neighbor_idx)]
-                    if neighbor_id in candidate_scores:
-                        sim = float(top_scores[disliked_idx][j]) if top_scores is not None else 1.0
-                        candidate_scores[neighbor_id] -= history_weight * sim
+                for disliked_id in disliked_movie_ids:
+                    disliked_idx = id_to_idx.get(disliked_id)
+                    if disliked_idx is None:
+                        continue
+                    for j, neighbor_idx in enumerate(top_indices[disliked_idx]):
+                        neighbor_id = tmdb_ids[int(neighbor_idx)]
+                        if neighbor_id in candidate_scores:
+                            sim = (
+                                float(top_scores[disliked_idx][j])
+                                if top_scores is not None
+                                else 1.0
+                            )
+                            history_scores[neighbor_id] = (
+                                history_scores.get(neighbor_id, 0.0) - history_weight * sim
+                            )
 
-            if self._state.cf_top_indices is not None:
+                max_history = max((abs(v) for v in history_scores.values()), default=0.0)
+                if max_history > 0:
+                    for neighbor_id, score in history_scores.items():
+                        candidate_scores[neighbor_id] += _HISTORY_SIGNAL_WEIGHT * (
+                            score / max_history
+                        )
+
+            if getattr(self._state, "cf_top_indices", None) is not None:
                 alpha = _get_alpha(
                     len(user_interactions), settings.CF_THRESHOLD, settings.CF_ALPHA
                 )
 
-        if alpha < 1.0 and self._state.cf_top_indices is not None:
+        if alpha < 1.0 and getattr(self._state, "cf_top_indices", None) is not None:
             cf_tmdb_ids = self._state.cf_tmdb_ids
             cf_top_indices = self._state.cf_top_indices
             cf_top_scores = getattr(self._state, "cf_top_scores", None)
@@ -318,6 +501,15 @@ class RecommendationService:
                 candidate_scores.pop(mid, None)
 
         top_ids = sorted(candidate_scores, key=lambda k: candidate_scores[k], reverse=True)[:TOP_K]
+        logger.info(
+            "recommendations genres=%s mood=%s user=%s candidates=%s interactions=%s top_ids=%s",
+            genres,
+            mood,
+            "auth" if user_id else "anonymous",
+            len(candidate_scores),
+            len(user_interactions),
+            top_ids,
+        )
 
         if not top_ids:
             return RecommendationResponse(recommendations=[])

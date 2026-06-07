@@ -48,6 +48,7 @@ async def lifespan(app: FastAPI):
     if os.path.exists(index_path):
         sim_data = joblib.load(index_path)
         app.state.tmdb_ids = sim_data["tmdb_ids"]
+        app.state.movie_embeddings = sim_data.get("embeddings")
         app.state.top_indices = sim_data["top_indices"]
         # top_scores is present in new-format artifacts (sentence-transformers);
         # absent in old TF-IDF artifacts — service falls back to frequency count
@@ -57,6 +58,7 @@ async def lifespan(app: FastAPI):
     else:
         app.state.tfidf_vectorizer = None
         app.state.tmdb_ids = []
+        app.state.movie_embeddings = None
         app.state.top_indices = None
         app.state.top_scores = None
         logger.warning("NLP artifacts not found — recommendations unavailable until worker runs")
@@ -88,7 +90,7 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown: close MongoDB connection
-    app.state.mongo_client.close()
+    await app.state.mongo_client.close()
 
 
 app = FastAPI(
