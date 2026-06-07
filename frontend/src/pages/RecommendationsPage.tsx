@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { isAxiosError } from 'axios';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useRecommendations,
   useSaveUserPreferences,
@@ -263,6 +264,7 @@ export function RecommendationsPage() {
   const [showValidationError, setShowValidationError] = useState(false);
   const [votes, setVotes] = useState<Map<number, FeedbackAction>>(new Map());
   const sidebarDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryClient = useQueryClient();
   const { mutate: submitFeedback } = useFeedback();
   const { mutate: savePreferences, isPending: isSavingPreferences } =
     useSaveUserPreferences(authCacheKey);
@@ -314,6 +316,9 @@ export function RecommendationsPage() {
     setShowValidationError(false);
     setSubmittedPrefs(nextPrefs);
     setDraftPrefs(nextPrefs);
+    // Invalidate cached recs immediately so the new prefs always fetch fresh,
+    // even if the same genre+mood combo was recently cached.
+    void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
     savePreferences(nextPrefs);
     setShowForm(false);
     setActiveMood(selectedMood);

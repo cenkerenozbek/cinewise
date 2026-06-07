@@ -53,6 +53,8 @@ export function useSaveUserPreferences(authCacheKey = 'anonymous') {
     onSuccess: (preferences) => {
       queryClient.setQueryData(['userPreferences', authCacheKey], preferences);
       void queryClient.invalidateQueries({ queryKey: ['userPreferences', authCacheKey] });
+      // Preferences changed → cached recommendations are stale, force fresh fetch
+      void queryClient.invalidateQueries({ queryKey: ['recommendations'] });
     },
   });
 }
