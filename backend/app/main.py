@@ -15,9 +15,11 @@ from app.core.config import settings
 from app.core.limiter import limiter
 from app.api.routes.auth import router as auth_router
 from app.api.routes.feedback import router as feedback_router
+from app.api.routes.history import router as history_router
 from app.api.routes.metrics import router as metrics_router
 from app.api.routes.movies import router as movies_router
 from app.api.routes.recommendations import router as recommendations_router
+from app.api.routes.watchlist import router as watchlist_router
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,8 @@ async def lifespan(app: FastAPI):
     # Create indexes for the interactions collection
     await app.state.db.interactions.create_index([("user_id", 1), ("movie_id", 1)], unique=True)
     await app.state.db.interactions.create_index([("user_id", 1)])
+    # Watchlist: unique per (user, movie)
+    await app.state.db.watchlists.create_index([("user_id", 1), ("movie_id", 1)], unique=True)
 
     # Load NLP artifacts for recommendation engine
     artifacts_dir = os.environ.get("ARTIFACTS_DIR", "/artifacts")
@@ -109,9 +113,11 @@ app.add_middleware(
 # Routers
 app.include_router(auth_router)
 app.include_router(feedback_router)
+app.include_router(history_router)
 app.include_router(metrics_router)
 app.include_router(movies_router)
 app.include_router(recommendations_router)
+app.include_router(watchlist_router)
 
 
 @app.get("/")

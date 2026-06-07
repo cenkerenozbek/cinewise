@@ -16,12 +16,20 @@ router = APIRouter(prefix="/api/feedback", tags=["feedback"])
 class FeedbackRequest(BaseModel):
     movie_id: int
     action: str
+    watch_completion: float | None = None
 
     @field_validator("action")
     @classmethod
     def action_must_be_binary(cls, v: str) -> str:
         if v not in ("like", "dislike"):
             raise ValueError("action must be 'like' or 'dislike'")
+        return v
+
+    @field_validator("watch_completion")
+    @classmethod
+    def completion_range(cls, v: float | None) -> float | None:
+        if v is not None and not (0.0 <= v <= 1.0):
+            raise ValueError("watch_completion must be between 0.0 and 1.0")
         return v
 
 
@@ -35,6 +43,18 @@ async def submit_feedback(
 
     Authenticated users only. Submitting feedback for the same movie replaces
     the previous action (upsert semantics). Returns 204 No Content on success.
+    Optional watch_completion (0.0–1.0) stores how much of the movie was watched.
     """
     repo = InteractionsRepository(db)
-    await repo.upsert(user_id, body.movie_id, body.action)
+    await repo.upsert(user_id, body.movie_id, body.action, body.watch_completion)
+
+
+@router.delete("/{movie_id}", status_code=204)
+async def delete_feedback(
+    movie_id: int,
+    user_id: str = Depends(get_current_user),
+    db=Depends(get_db),
+) -> None:
+    """Remove a user's feedback for a specific movie."""
+    repo = InteractionsRepository(db)
+    await repo.delete(user_id, movie_id)

@@ -94,6 +94,23 @@ MOOD_BOOST = 1.3
 TOP_K = 10
 
 
+def _get_completion_weight(completion: float | None) -> float:
+    """Map watch_completion (0.0–1.0) to a feedback weight multiplier.
+
+    Higher completion = stronger signal that the user enjoyed the film.
+    Barely watched = mild negative signal (different from dislike).
+    """
+    if completion is None:
+        return 1.0
+    if completion >= 0.9:
+        return 1.5
+    if completion >= 0.5:
+        return 1.2
+    if completion >= 0.1:
+        return 1.0
+    return -0.3
+
+
 def build_explanation(genres: list[str], mood: str | None) -> str:
     """Build human-readable explanation referencing user preferences."""
     if len(genres) == 1:
@@ -201,16 +218,41 @@ class RecommendationService:
                 ia["movie_id"] for ia in user_interactions if ia["action"] == "dislike"
             ]
 
-            feedback_weight = max(5.0, min(30.0, len(genre_docs) / 20.0))
-            _apply_interaction_content_feedback(
-                candidate_scores,
-                liked_movie_ids,
-                disliked_movie_ids,
-                tmdb_ids,
-                top_indices,
-                feedback_weight,
-                top_scores=top_scores,
-            )
+            # Build completion weight map from watch_completion values
+            completion_map: dict[int, float | None] = {
+                ia["movie_id"]: ia.get("watch_completion")
+                for ia in user_interactions
+                if ia.get("watch_completion") is not None
+            }
+
+            base_feedback_weight = max(5.0, min(30.0, len(genre_docs) / 20.0))
+            id_to_idx_feedback = {tid: i for i, tid in enumerate(tmdb_ids)}
+
+            # Apply per-movie completion-weighted content feedback
+            for liked_id in liked_movie_ids:
+                liked_idx = id_to_idx_feedback.get(liked_id)
+                if liked_idx is None:
+                    continue
+                completion = completion_map.get(liked_id)
+                weight = base_feedback_weight * _get_completion_weight(completion)
+                if weight == 0:
+                    continue
+                for j, neighbor_idx in enumerate(top_indices[liked_idx]):
+                    neighbor_id = tmdb_ids[int(neighbor_idx)]
+                    sim = float(top_scores[liked_idx][j]) if top_scores is not None else 1.0
+                    candidate_scores[neighbor_id] = (
+                        candidate_scores.get(neighbor_id, 0.0) + weight * sim
+                    )
+
+            for disliked_id in disliked_movie_ids:
+                disliked_idx = id_to_idx_feedback.get(disliked_id)
+                if disliked_idx is None:
+                    continue
+                for j, neighbor_idx in enumerate(top_indices[disliked_idx]):
+                    neighbor_id = tmdb_ids[int(neighbor_idx)]
+                    if neighbor_id in candidate_scores:
+                        sim = float(top_scores[disliked_idx][j]) if top_scores is not None else 1.0
+                        candidate_scores[neighbor_id] -= base_feedback_weight * sim
 
             if self._state.cf_top_indices is not None:
                 alpha = _get_alpha(

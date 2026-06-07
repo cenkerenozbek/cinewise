@@ -116,3 +116,46 @@ async def test_interaction_persisted_in_db(client, test_db, seed_movies):
     assert doc["action"] == "like"
     assert doc["movie_id"] == 100
     assert doc["user_id"] == "persistuser"
+
+
+# ---------------------------------------------------------------------------
+# Watch completion tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_submit_feedback_with_watch_completion(client, test_db, seed_movies):
+    """POST /api/feedback with watch_completion=0.85 returns 204 and stores the value."""
+    headers = _auth_headers("watchuser")
+
+    response = await client.post(
+        "/api/feedback",
+        json={"movie_id": 100, "action": "like", "watch_completion": 0.85},
+        headers=headers,
+    )
+    assert response.status_code == 204
+
+    doc = await test_db.interactions.find_one({"user_id": "watchuser", "movie_id": 100})
+    assert doc is not None
+    assert doc["watch_completion"] == pytest.approx(0.85)
+
+
+@pytest.mark.asyncio
+async def test_submit_feedback_completion_out_of_range(client):
+    """POST /api/feedback with watch_completion=1.5 returns 422."""
+    response = await client.post(
+        "/api/feedback",
+        json={"movie_id": 100, "action": "like", "watch_completion": 1.5},
+        headers=_auth_headers(),
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_watch_completion_optional(client, seed_movies):
+    """POST /api/feedback without watch_completion field still returns 204 (backward compat)."""
+    response = await client.post(
+        "/api/feedback",
+        json={"movie_id": 100, "action": "dislike"},
+        headers=_auth_headers(),
+    )
+    assert response.status_code == 204

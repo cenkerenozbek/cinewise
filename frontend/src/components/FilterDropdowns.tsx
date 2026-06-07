@@ -16,6 +16,12 @@ function getYearOptions(): number[] {
   return years;
 }
 
+const selectStyle = {
+  background: 'var(--cw-surface)',
+  borderColor: 'var(--cw-border)',
+  color: '#94a3b8',
+};
+
 export function FilterDropdowns({ genre, year, onGenreChange, onYearChange }: FilterDropdownsProps) {
   const { data: genres } = useGenres();
 
@@ -24,25 +30,23 @@ export function FilterDropdowns({ genre, year, onGenreChange, onYearChange }: Fi
       <select
         value={genre}
         onChange={(e) => onGenreChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
+        style={selectStyle}
       >
         <option value="">All Genres</option>
         {genres?.map((g) => (
-          <option key={g} value={g}>
-            {g}
-          </option>
+          <option key={g} value={g}>{g}</option>
         ))}
       </select>
       <select
         value={year}
         onChange={(e) => onYearChange(e.target.value)}
-        className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="px-3 py-2.5 border rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
+        style={selectStyle}
       >
         <option value="">All Years</option>
         {getYearOptions().map((y) => (
-          <option key={y} value={String(y)}>
-            {y}
-          </option>
+          <option key={y} value={String(y)}>{y}</option>
         ))}
       </select>
     </div>

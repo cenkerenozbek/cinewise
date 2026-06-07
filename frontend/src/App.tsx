@@ -7,6 +7,10 @@ import { RegisterPage } from './pages/RegisterPage';
 import { HomePage } from './pages/HomePage';
 import { MovieDetailPage } from './pages/MovieDetailPage';
 import { RecommendationsPage } from './pages/RecommendationsPage';
+import { ProfilePage } from './pages/ProfilePage';
+import { HistoryPage } from './pages/HistoryPage';
+import { WatchlistPage } from './pages/WatchlistPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthContext();
@@ -22,10 +26,23 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
           <Route path="/movie/:tmdbId" element={<MovieDetailPage />} />
           <Route
             path="/recommendations"
             element={<PrivateRoute><RecommendationsPage /></PrivateRoute>}
+          />
+          <Route
+            path="/profile"
+            element={<PrivateRoute><ProfilePage /></PrivateRoute>}
+          />
+          <Route
+            path="/history"
+            element={<PrivateRoute><HistoryPage /></PrivateRoute>}
+          />
+          <Route
+            path="/watchlist"
+            element={<PrivateRoute><WatchlistPage /></PrivateRoute>}
           />
         </Routes>
       </main>

@@ -5,6 +5,7 @@ import type { FeedbackAction } from '../lib/types';
 interface FeedbackPayload {
   movie_id: number;
   action: FeedbackAction;
+  watch_completion?: number;
 }
 
 export function useFeedback() {

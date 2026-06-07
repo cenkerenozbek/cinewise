@@ -11,15 +11,16 @@ import { RecommendationCard } from '../components/RecommendationCard';
 import { useFeedback } from '../hooks/useFeedback';
 import { useAuth } from '../hooks/useAuth';
 import { useMetrics } from '../hooks/useMetrics';
+import { useMoodTheme } from '../features/mood/MoodThemeContext';
 import type { FeedbackAction, UserPreferences } from '../lib/types';
 
 function SkeletonCard() {
   return (
-    <div className="rounded-lg overflow-hidden bg-white shadow animate-pulse">
-      <div className="aspect-[2/3] bg-gray-300" />
-      <div className="p-2 space-y-2">
-        <div className="h-3 bg-gray-300 rounded w-3/4" />
-        <div className="h-2 bg-gray-200 rounded w-1/2" />
+    <div className="rounded-xl overflow-hidden animate-pulse" style={{ background: 'var(--cw-surface)' }}>
+      <div className="aspect-[2/3]" style={{ background: 'var(--cw-surface-elevated)' }} />
+      <div className="p-2.5 space-y-2">
+        <div className="h-3 rounded w-3/4" style={{ background: 'var(--cw-surface-elevated)' }} />
+        <div className="h-2 rounded w-1/2" style={{ background: 'var(--cw-surface-elevated)' }} />
       </div>
     </div>
   );
@@ -47,23 +48,26 @@ function PreferenceForm({
   showValidationError,
 }: PreferenceFormProps) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div
+      className="rounded-2xl border p-6"
+      style={{ background: 'var(--cw-surface)', borderColor: 'var(--cw-border)' }}
+    >
       <div className="space-y-6">
         <div>
-          <p className="text-sm font-bold text-gray-700">Select Genres</p>
+          <p className="text-sm font-bold text-slate-300">Select Genres</p>
           <GenreChipGroup
             genres={availableGenres}
             selected={selectedGenres}
             onToggle={onGenreToggle}
           />
           {showValidationError && (
-            <p className="text-sm text-red-600 mt-1">Please select at least one genre.</p>
+            <p className="text-sm text-red-400 mt-1">Please select at least one genre.</p>
           )}
         </div>
         <div>
-          <p className="text-sm font-bold text-gray-700">
+          <p className="text-sm font-bold text-slate-300">
             How are you feeling?{' '}
-            <span className="text-xs text-gray-400 font-normal">(optional)</span>
+            <span className="text-xs text-slate-500 font-normal">(optional)</span>
           </p>
           <MoodChipGroup selected={selectedMood} onSelect={onMoodSelect} />
         </div>
@@ -72,7 +76,8 @@ function PreferenceForm({
         type="button"
         onClick={onSubmit}
         disabled={selectedGenres.length === 0}
-        className="mt-6 w-full py-2 px-4 bg-blue-600 text-white font-bold rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        className="mt-6 w-full py-2.5 px-4 font-bold rounded-xl disabled:opacity-50 transition-all text-white"
+        style={{ background: 'var(--cw-accent)' }}
       >
         {submitLabel}
       </button>
@@ -82,6 +87,7 @@ function PreferenceForm({
 
 export function RecommendationsPage() {
   const { isAuthenticated, user } = useAuth();
+  const { setActiveMood } = useMoodTheme();
   const authCacheKey = user?.id ?? 'anonymous';
   const { data: savedPrefs, isLoading: prefsLoading } = useUserPreferences(
     isAuthenticated,
@@ -124,11 +130,7 @@ export function RecommendationsPage() {
       const nextGenres = baseGenres.includes(genre)
         ? baseGenres.filter((g) => g !== genre)
         : [...baseGenres, genre];
-
-      return {
-        genres: nextGenres,
-        mood: prev?.mood ?? selectedMood,
-      };
+      return { genres: nextGenres, mood: prev?.mood ?? selectedMood };
     });
     setShowValidationError(false);
   }
@@ -151,6 +153,8 @@ export function RecommendationsPage() {
     setDraftPrefs(nextPrefs);
     savePreferences(nextPrefs);
     setShowForm(false);
+    // Trigger mood-based theme change
+    setActiveMood(selectedMood);
   }
 
   function handleVote(tmdbId: number, action: FeedbackAction) {
@@ -160,7 +164,6 @@ export function RecommendationsPage() {
       { movie_id: tmdbId, action },
       {
         onError: () => {
-          // Revert on failure
           if (prev) {
             setVotes((m) => new Map(m).set(tmdbId, prev));
           } else {
@@ -181,7 +184,7 @@ export function RecommendationsPage() {
   if (prefsLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Your Recommendations</h1>
+        <h1 className="text-2xl font-bold text-slate-100 mb-4">Your Recommendations</h1>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <SkeletonCard key={i} />
@@ -191,18 +194,12 @@ export function RecommendationsPage() {
     );
   }
 
-  // State A: no preferences submitted yet (and no saved prefs loading)
   if (!hasSubmitted && !prefsLoading) {
     return (
       <div className="max-w-7xl mx-auto px-4 py-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-4">Your Recommendations</h1>
+        <h1 className="text-2xl font-bold text-slate-100 mb-2">Your Recommendations</h1>
+        <p className="text-slate-400 mb-6 text-sm">Tell us what you enjoy to get started.</p>
         <div className="max-w-xl">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            What kind of movies do you enjoy?
-          </h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Select at least one genre to get personalized recommendations.
-          </p>
           <PreferenceForm
             availableGenres={availableGenres}
             selectedGenres={selectedGenres}
@@ -220,47 +217,61 @@ export function RecommendationsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-4">Your Recommendations</h1>
+      <h1 className="text-2xl font-bold text-slate-100 mb-4">Your Recommendations</h1>
 
-      {/* Evaluation metrics -- shown only when metrics.json was loaded */}
+      {/* Evaluation metrics */}
       {metrics && (
-        <div className="mb-4 text-sm text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2 flex items-center gap-4">
+        <div
+          className="mb-4 text-sm rounded-xl px-4 py-2.5 flex flex-wrap items-center gap-4 border"
+          style={{ background: 'var(--cw-surface)', borderColor: 'var(--cw-border)' }}
+        >
           <span>
-            <span className="font-medium text-gray-700">Precision@10:</span>{' '}
-            {metrics.precision_at_10.toFixed(3)}
+            <span className="font-bold text-slate-300">Hit Rate@10:</span>{' '}
+            <span className="text-slate-400">{metrics.precision_at_10.toFixed(3)}</span>
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-slate-600">|</span>
           <span>
-            <span className="font-medium text-gray-700">NDCG@10:</span>{' '}
-            {metrics.ndcg_at_10.toFixed(3)}
+            <span className="font-bold text-slate-300">NDCG@10:</span>{' '}
+            <span className="text-slate-400">{metrics.ndcg_at_10.toFixed(3)}</span>
           </span>
-          <span className="text-gray-300">|</span>
-          <span>
+          <span className="text-slate-600">|</span>
+          <span className="text-slate-500 text-xs">
             Evaluated on {metrics.n_users} users ({metrics.eval_date})
           </span>
         </div>
       )}
 
+      {/* Active preferences bar */}
       {activePrefs && (
-        <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-          <span className="font-bold">Active preferences:</span>{' '}
-          {activePrefs.genres.join(', ')}
-          {activePrefs.mood ? ` / ${activePrefs.mood}` : ''}
-          {isSavingPreferences && <span className="ml-2 text-blue-700">Saving...</span>}
+        <div
+          className="mb-4 rounded-xl border px-4 py-3 text-sm flex items-center gap-2 flex-wrap"
+          style={{ borderColor: 'var(--cw-accent)33', background: 'var(--cw-accent)11' }}
+        >
+          <span className="font-bold text-slate-300">Active:</span>
+          <span className="text-slate-400">{activePrefs.genres.join(', ')}</span>
+          {activePrefs.mood && (
+            <span
+              className="px-2 py-0.5 rounded-full text-xs font-bold border"
+              style={{ borderColor: 'var(--cw-accent)', color: 'var(--cw-accent)', background: 'var(--cw-accent)15' }}
+            >
+              {activePrefs.mood}
+            </span>
+          )}
+          {isSavingPreferences && <span className="text-xs text-slate-500 ml-auto">Saving...</span>}
         </div>
       )}
 
-      {/* EditPreferencesControl */}
       <div className="mb-4">
         <button
           type="button"
           onClick={() => setShowForm((prev) => !prev)}
-          className="px-4 py-2 text-sm font-bold bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          className="px-4 py-2 text-sm font-bold rounded-xl border transition-all"
+          style={{ borderColor: 'var(--cw-border)', color: 'var(--cw-accent)' }}
         >
-          {showForm ? 'Update Recommendations' : 'Edit Preferences'}
+          {showForm ? 'Hide' : 'Edit Preferences'}
         </button>
         {showForm && (
-          <div className="mt-4">
+          <div className="mt-4 max-w-xl">
             <PreferenceForm
               availableGenres={availableGenres}
               selectedGenres={selectedGenres}
@@ -275,7 +286,6 @@ export function RecommendationsPage() {
         )}
       </div>
 
-      {/* State B: loading */}
       {recsLoading && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -284,47 +294,32 @@ export function RecommendationsPage() {
         </div>
       )}
 
-      {/* State D: error */}
       {isError && !recsLoading && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4">
           {rateLimited ? (
             <>
-              <h3 className="text-sm font-bold text-red-800 mb-1">Too many requests</h3>
-              <p className="text-sm text-red-700 mb-3">
-                Please wait a moment before requesting new recommendations.
-              </p>
+              <h3 className="text-sm font-bold text-red-400 mb-1">Too many requests</h3>
+              <p className="text-sm text-red-400/80 mb-3">Please wait a moment before requesting new recommendations.</p>
             </>
           ) : (
             <>
-              <h3 className="text-sm font-bold text-red-800 mb-1">Could not load recommendations</h3>
-              <p className="text-sm text-red-700 mb-3">
-                Something went wrong. Check your connection and try again.
-              </p>
+              <h3 className="text-sm font-bold text-red-400 mb-1">Could not load recommendations</h3>
+              <p className="text-sm text-red-400/80 mb-3">Something went wrong. Check your connection and try again.</p>
             </>
           )}
-          <button
-            type="button"
-            onClick={() => refetch()}
-            className="text-sm text-red-700 font-bold hover:underline"
-          >
+          <button type="button" onClick={() => refetch()} className="text-sm font-bold" style={{ color: 'var(--cw-accent)' }}>
             Try Again
           </button>
         </div>
       )}
 
-      {/* No results state */}
       {!recsLoading && !isError && recommendations.length === 0 && hasSubmitted && (
         <div className="text-center py-20">
-          <p className="text-lg font-bold text-gray-900">
-            No recommendations found for your preferences.
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Try selecting different genres or changing your mood.
-          </p>
+          <p className="text-lg font-bold text-slate-300">No recommendations found for your preferences.</p>
+          <p className="text-sm text-slate-500 mt-2">Try selecting different genres or changing your mood.</p>
         </div>
       )}
 
-      {/* State C: results */}
       {!recsLoading && !isError && recommendations.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
           {recommendations.map((item) => (

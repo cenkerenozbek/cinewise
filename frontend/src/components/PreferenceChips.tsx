@@ -12,11 +12,20 @@ export function PreferenceChip({ label, selected, onClick }: PreferenceChipProps
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className={`min-h-[44px] sm:min-h-0 rounded-full px-4 py-2 text-sm font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 ${
+      className="min-h-[44px] sm:min-h-0 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 border"
+      style={
         selected
-          ? 'bg-blue-600 border border-blue-600 text-white hover:bg-blue-700'
-          : 'bg-white border border-gray-300 text-gray-700 hover:border-blue-400 hover:text-blue-600'
-      }`}
+          ? {
+              background: 'var(--cw-accent)',
+              borderColor: 'var(--cw-accent)',
+              color: '#ffffff',
+            }
+          : {
+              background: 'var(--cw-surface-elevated)',
+              borderColor: 'var(--cw-border)',
+              color: '#94a3b8',
+            }
+      }
     >
       {label}
     </button>
@@ -49,16 +58,41 @@ interface MoodChipGroupProps {
   onSelect: (mood: string | null) => void;
 }
 
+const MOOD_EMOJIS: Record<string, string> = {
+  Happy: '😄',
+  Tense: '😬',
+  Relaxing: '😌',
+  'Mind-bending': '🌀',
+  Romantic: '❤️',
+};
+
 export function MoodChipGroup({ selected, onSelect }: MoodChipGroupProps) {
   return (
     <div role="radiogroup" aria-label="Mood selection (optional)" className="flex flex-wrap gap-2 mt-2">
       {MOODS.map((mood) => (
-        <PreferenceChip
+        <button
           key={mood}
-          label={mood}
-          selected={selected === mood}
+          type="button"
+          aria-pressed={selected === mood}
           onClick={() => onSelect(selected === mood ? null : mood)}
-        />
+          className="min-h-[44px] sm:min-h-0 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200 cursor-pointer border flex items-center gap-1.5"
+          style={
+            selected === mood
+              ? {
+                  background: 'var(--cw-accent)',
+                  borderColor: 'var(--cw-accent)',
+                  color: '#ffffff',
+                }
+              : {
+                  background: 'var(--cw-surface-elevated)',
+                  borderColor: 'var(--cw-border)',
+                  color: '#94a3b8',
+                }
+          }
+        >
+          <span>{MOOD_EMOJIS[mood] ?? ''}</span>
+          {mood}
+        </button>
       ))}
     </div>
   );

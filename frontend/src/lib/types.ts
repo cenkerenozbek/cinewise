@@ -60,9 +60,19 @@ export interface UserPreferences {
 
 export type FeedbackAction = "like" | "dislike";
 
+export type WatchCompletion = 'barely' | 'half' | 'mostly' | 'finished';
+
+export const WATCH_COMPLETION_VALUES: Record<WatchCompletion, number> = {
+  barely: 0.05,
+  half: 0.5,
+  mostly: 0.75,
+  finished: 1.0,
+};
+
 export interface UserInteraction {
   movie_id: number;
   action: FeedbackAction;
+  watch_completion?: number;
 }
 
 export interface MetricsData {
