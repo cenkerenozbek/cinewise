@@ -1,4 +1,4 @@
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthContext } from '../features/auth/auth-context';
 import { useMoodTheme } from '../features/mood/MoodThemeContext';
 
@@ -7,6 +7,17 @@ export function Navbar() {
   const { isDark, toggleTheme } = useMoodTheme();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get('q') ?? '';
+
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    if (location.pathname !== '/') {
+      navigate(`/?q=${encodeURIComponent(value)}`);
+    } else {
+      setSearchParams(value ? { q: value } : {}, { replace: true });
+    }
+  }
 
   function handleLogout() {
     logout();
@@ -27,8 +38,9 @@ export function Navbar() {
   );
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-950/90 backdrop-blur-md border-b border-white/5 text-white px-6 py-3 flex items-center justify-between">
-      <Link to="/" className="flex items-center gap-2 text-xl font-bold tracking-wide hover:text-[var(--cw-accent)] transition-colors">
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-gray-950/90 backdrop-blur-md border-b border-white/5 text-white px-6 py-3 flex items-center gap-4">
+      {/* Logo */}
+      <Link to="/" className="flex items-center gap-2 text-xl font-bold tracking-wide hover:text-[var(--cw-accent)] transition-colors shrink-0">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--cw-accent)]">
           <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
           <line x1="7" y1="2" x2="7" y2="22"/>
@@ -41,7 +53,39 @@ export function Navbar() {
         </svg>
         Cinewise
       </Link>
-      <div className="flex items-center gap-5">
+
+      {/* Global search — always visible, centered */}
+      <div className="relative flex-1 max-w-md mx-auto">
+        <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+          </svg>
+        </div>
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          placeholder="Search movies..."
+          className="w-full pl-9 pr-3 py-2 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 transition-all"
+          style={{
+            background: 'var(--cw-surface)',
+            border: '1px solid var(--cw-border)',
+          }}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchParams({}, { replace: true })}
+            className="absolute inset-y-0 right-2 flex items-center px-1 text-slate-500 hover:text-slate-300"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      <div className="flex items-center gap-5 shrink-0">
           {/* Dark / Light toggle */}
           <button
             type="button"

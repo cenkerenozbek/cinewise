@@ -1,8 +1,7 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMovieSearch } from '../hooks/useMovies';
 import { useRecommendations, useUserPreferences } from '../hooks/useRecommendations';
-import { SearchBar } from '../components/SearchBar';
 import { MovieGrid } from '../components/MovieGrid';
 import { FilterDropdowns } from '../components/FilterDropdowns';
 import { RecommendationCard } from '../components/RecommendationCard';
@@ -14,7 +13,8 @@ import type { FeedbackAction } from '../lib/types';
 export function HomePage() {
   const { isAuthenticated, user } = useAuth();
   const { setActiveMood } = useMoodTheme();
-  const [query, setQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get('q') ?? '';
   const [genre, setGenre] = useState('');
   const [year, setYear] = useState('');
   const [page, setPage] = useState(1);
@@ -53,10 +53,8 @@ export function HomePage() {
 
   const personalizedRecommendations = personalizedData?.recommendations ?? [];
 
-  function handleSearchChange(value: string) {
-    setQuery(value);
-    setPage(1);
-  }
+  // Reset to page 1 whenever the search query changes from the navbar
+  useEffect(() => { setPage(1); }, [query]);
 
   function handleGenreChange(value: string) {
     setGenre(value);
@@ -222,7 +220,6 @@ export function HomePage() {
             {isSearching ? 'Search Results' : shouldShowPersonalized ? 'Browse Movies' : 'Popular Movies'}
           </h2>
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
-            <SearchBar value={query} onChange={handleSearchChange} />
             <FilterDropdowns
               genre={genre}
               year={year}
