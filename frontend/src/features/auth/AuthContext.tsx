@@ -75,9 +75,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser({ id: meRes.data.user_id, email });
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
-    await api.post('/auth/register', { email, password });
-    // Auto-login after successful registration
+  const register = useCallback(async (email: string, password: string, firstName?: string, lastName?: string) => {
+    await api.post('/auth/register', {
+      email,
+      password,
+      first_name: firstName || undefined,
+      last_name: lastName || undefined,
+    });
     await login(email, password);
   }, [login]);
 

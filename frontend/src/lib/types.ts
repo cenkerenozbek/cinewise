@@ -5,6 +5,7 @@ export interface MovieSummary {
   year: number | null;
   genres: string[];
   poster_path: string | null;
+  backdrop_path: string | null;
   rating: number | null;
 }
 
@@ -33,7 +34,7 @@ export interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, firstName?: string, lastName?: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -44,6 +45,7 @@ export interface RecommendationItem {
   year: number | null;
   genres: string[];
   poster_path: string | null;
+  backdrop_path: string | null;
   rating: number | null;
   overview: string | null;
   explanation: string;

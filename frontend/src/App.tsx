@@ -21,7 +21,7 @@ function App() {
   return (
     <AuthProvider>
       <Navbar />
-      <main className="pt-14">
+      <main className="pt-16">
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />

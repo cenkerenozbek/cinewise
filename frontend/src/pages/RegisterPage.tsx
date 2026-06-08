@@ -6,6 +6,8 @@ export function RegisterPage() {
   const { register } = useAuthContext();
   const navigate = useNavigate();
 
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -28,7 +30,7 @@ export function RegisterPage() {
 
     setSubmitting(true);
     try {
-      await register(email, password);
+      await register(email, password, firstName.trim() || undefined, lastName.trim() || undefined);
       navigate('/onboarding');
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;
@@ -53,6 +55,36 @@ export function RegisterPage() {
           <p className="text-sm text-slate-400 mt-1">Create your account and discover films you'll love</p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="firstName" className="block text-sm font-medium text-slate-300 mb-1.5">
+                First Name
+              </label>
+              <input
+                id="firstName"
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ background: 'var(--cw-surface-elevated)', borderColor: 'var(--cw-border)' }}
+                placeholder="John"
+              />
+            </div>
+            <div>
+              <label htmlFor="lastName" className="block text-sm font-medium text-slate-300 mb-1.5">
+                Last Name
+              </label>
+              <input
+                id="lastName"
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 transition-all"
+                style={{ background: 'var(--cw-surface-elevated)', borderColor: 'var(--cw-border)' }}
+                placeholder="Doe"
+              />
+            </div>
+          </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">
               Email

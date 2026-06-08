@@ -40,6 +40,18 @@ export function useMovieDetail(tmdbId: number) {
   });
 }
 
+export function useMovieTrailer(tmdbId: number) {
+  return useQuery<{ youtube_key: string | null }>({
+    queryKey: ['movie-trailer', tmdbId],
+    queryFn: async () => {
+      const { data } = await api.get<{ youtube_key: string | null }>(`/movies/${tmdbId}/trailer`);
+      return data;
+    },
+    enabled: !!tmdbId,
+    staleTime: 30 * 60 * 1000, // 30 minutes
+  });
+}
+
 export function useGenres() {
   return useQuery<string[]>({
     queryKey: ['genres'],

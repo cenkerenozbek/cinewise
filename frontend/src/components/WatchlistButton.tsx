@@ -43,16 +43,15 @@ export function WatchlistButton({ movieId, size = 'sm', className = '' }: Watchl
       style={isInWatchlist ? { background: 'var(--cw-accent)' } : undefined}
       title={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className={iconDim}
-        viewBox="0 0 20 20"
-        fill={isInWatchlist ? 'currentColor' : 'none'}
-        stroke="currentColor"
-        strokeWidth={isInWatchlist ? 0 : 1.5}
-      >
-        <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
-      </svg>
+      {isInWatchlist ? (
+        <svg xmlns="http://www.w3.org/2000/svg" className={iconDim} viewBox="0 0 24 24" fill="currentColor">
+          <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+        </svg>
+      ) : (
+        <svg xmlns="http://www.w3.org/2000/svg" className={iconDim} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+        </svg>
+      )}
     </button>
   );
 }

@@ -19,7 +19,7 @@ const MOOD_THEMES_DARK: Record<string, MoodTheme> = {
 };
 
 const MOOD_THEMES_LIGHT: Record<string, MoodTheme> = {
-  default:       { bg: '#f5f5f7', surface: '#ffffff', surfaceElevated: '#eeeef3', accent: '#6366f1', accentHover: '#4f46e5', border: 'rgba(0,0,0,0.08)' },
+  default:       { bg: '#ffffff', surface: '#f9fafb', surfaceElevated: '#f3f4f6', accent: '#be123c', accentHover: '#9f1239', border: 'rgba(0,0,0,0.1)' },
   Happy:         { bg: '#fffbeb', surface: '#ffffff', surfaceElevated: '#fef9c3', accent: '#d97706', accentHover: '#b45309', border: 'rgba(0,0,0,0.08)' },
   Tense:         { bg: '#f0fdfa', surface: '#ffffff', surfaceElevated: '#ccfbf1', accent: '#0d9488', accentHover: '#0f766e', border: 'rgba(0,0,0,0.08)' },
   Relaxing:      { bg: '#f5f3ff', surface: '#ffffff', surfaceElevated: '#ede9fe', accent: '#7c3aed', accentHover: '#6d28d9', border: 'rgba(0,0,0,0.08)' },
@@ -47,9 +47,9 @@ export function MoodThemeProvider({ children }: { children: React.ReactNode }) {
   const [activeMood, setActiveMood] = useState<string | null>(null);
   const [isDark, setIsDark] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('cw-theme') !== 'light';
+      return localStorage.getItem('cw-theme') === 'dark';
     } catch {
-      return true;
+      return false;
     }
   });
 
