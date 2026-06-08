@@ -1,20 +1,42 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { useHistoryStats, useHistoryList } from '../hooks/useHistory';
 import { TasteProfileChart } from '../components/TasteProfileChart';
 import { useMoodTheme } from '../features/mood/MoodThemeContext';
+import { useProfile, useUpdateProfile } from '../hooks/useProfile';
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w92';
 const CF_THRESHOLD = 5;
 
 export function ProfilePage() {
   const { user } = useAuth();
-  const { activeMood } = useMoodTheme();
+  const { activeMood, isDark } = useMoodTheme();
   const { data: stats, isLoading: statsLoading } = useHistoryStats();
   const { data: historyData } = useHistoryList(1, 'all');
+  const { data: profile } = useProfile();
+  const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfile();
+
+  const [editMode, setEditMode] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+
+  function openEdit() {
+    setFirstName(profile?.first_name ?? '');
+    setLastName(profile?.last_name ?? '');
+    setEditMode(true);
+  }
+
+  function handleSave() {
+    updateProfile(
+      { first_name: firstName.trim() || undefined, last_name: lastName.trim() || undefined },
+      { onSuccess: () => setEditMode(false) },
+    );
+  }
 
   const recentActivity = historyData?.items.slice(0, 5) ?? [];
-  const initial = user?.email?.[0]?.toUpperCase() ?? '?';
+  const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || null;
+  const initial = displayName?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?';
   const interactionCount = stats?.total ?? 0;
   const personalizationPct = Math.min(100, Math.round((interactionCount / CF_THRESHOLD) * 100));
 
@@ -32,18 +54,81 @@ export function ProfilePage() {
           {initial}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-slate-100 font-bold truncate">{user?.email}</p>
-          <p className="text-slate-500 text-sm">Active member</p>
+          {displayName && <p className="text-slate-100 font-bold truncate">{displayName}</p>}
+          <p className="text-slate-400 text-sm truncate">{user?.email}</p>
         </div>
-        {activeMood && (
-          <span
-            className="px-3 py-1 rounded-full text-xs font-bold border flex-shrink-0"
-            style={{ borderColor: 'var(--cw-accent)', color: 'var(--cw-accent)', background: 'var(--cw-accent)15' }}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {activeMood && (
+            <span
+              className="px-3 py-1 rounded-full text-xs font-medium border"
+              style={{ borderColor: 'var(--cw-accent)', color: 'var(--cw-accent)', background: 'var(--cw-accent)15' }}
+            >
+              {activeMood}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={openEdit}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border transition-all hover:opacity-80"
+            style={{ borderColor: 'var(--cw-border)', color: 'var(--cw-accent)' }}
           >
-            Mood: {activeMood}
-          </span>
-        )}
+            Edit Profile
+          </button>
+        </div>
       </div>
+
+      {/* Edit profile form */}
+      {editMode && (
+        <div
+          className="rounded-2xl border p-6 mb-6"
+          style={{ background: 'var(--cw-surface)', borderColor: 'var(--cw-border)' }}
+        >
+          <h2 className="text-sm font-medium text-slate-300 mb-4">Edit Profile</h2>
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">First Name</label>
+              <input
+                type="text"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="First name"
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--cw-accent)] text-slate-100"
+                style={{ background: 'var(--cw-surface-elevated)', border: '1px solid var(--cw-border)' }}
+              />
+            </div>
+            <div>
+              <label className="text-xs text-slate-500 mb-1 block">Last Name</label>
+              <input
+                type="text"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Last name"
+                className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--cw-accent)] text-slate-100"
+                style={{ background: 'var(--cw-surface-elevated)', border: '1px solid var(--cw-border)' }}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={isUpdating}
+              className="px-4 py-2 text-sm font-medium rounded-lg text-white disabled:opacity-50 transition-opacity hover:opacity-90"
+              style={{ background: 'var(--cw-accent)' }}
+            >
+              {isUpdating ? 'Saving…' : 'Save'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditMode(false)}
+              className="px-4 py-2 text-sm font-medium rounded-lg border transition-all hover:opacity-80"
+              style={{ borderColor: 'var(--cw-border)', color: isDark ? '#94a3b8' : '#6b7280' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Stat cards */}
       {statsLoading ? (
