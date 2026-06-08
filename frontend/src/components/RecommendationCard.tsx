@@ -3,12 +3,13 @@ import { MovieCard } from './MovieCard';
 import { FeedbackControls } from './FeedbackControls';
 import type { FeedbackAction, MovieSummary, RecommendationItem, WatchCompletion } from '../lib/types';
 import { WATCH_COMPLETION_VALUES } from '../lib/types';
-import { useFeedback } from '../hooks/useFeedback';
+import { useFeedback, useDeleteFeedback } from '../hooks/useFeedback';
 
 interface RecommendationCardProps {
   item: RecommendationItem;
   vote?: FeedbackAction;
   onVote?: (tmdbId: number, action: FeedbackAction) => void;
+  onClearVote?: (tmdbId: number) => void;
   showFeedback?: boolean;
 }
 
@@ -20,6 +21,7 @@ function recommendationToMovieSummary(item: RecommendationItem): MovieSummary {
     year: item.year,
     genres: item.genres,
     poster_path: item.poster_path,
+    backdrop_path: item.backdrop_path,
     rating: item.rating,
   };
 }
@@ -28,11 +30,13 @@ export function RecommendationCard({
   item,
   vote,
   onVote,
+  onClearVote,
   showFeedback = false,
 }: RecommendationCardProps) {
   const feedbackEnabled = showFeedback && onVote;
   const [watchCompletion, setWatchCompletion] = useState<WatchCompletion | null>(null);
   const { mutate: submitFeedback } = useFeedback();
+  const { mutate: deleteFeedback } = useDeleteFeedback();
 
   function handleWatchCompletion(v: WatchCompletion) {
     setWatchCompletion(v);
@@ -40,6 +44,15 @@ export function RecommendationCard({
       movie_id: item.tmdb_id,
       action: vote ?? 'like',
       watch_completion: WATCH_COMPLETION_VALUES[v],
+    });
+  }
+
+  function handleClearVote() {
+    const prev = vote;
+    onClearVote?.(item.tmdb_id);
+    setWatchCompletion(null);
+    deleteFeedback(item.tmdb_id, {
+      onError: () => onVote?.(item.tmdb_id, prev as FeedbackAction),
     });
   }
 
@@ -57,6 +70,7 @@ export function RecommendationCard({
               title={item.title}
               vote={vote}
               onVote={(action) => onVote(item.tmdb_id, action)}
+              onClearVote={handleClearVote}
               watchCompletion={watchCompletion}
               onWatchCompletion={handleWatchCompletion}
             />

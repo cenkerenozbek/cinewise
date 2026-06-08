@@ -23,3 +23,16 @@ export function useFeedback() {
     },
   });
 }
+
+export function useDeleteFeedback() {
+  const queryClient = useQueryClient();
+
+  return useMutation<void, Error, number>({
+    mutationFn: async (movieId) => {
+      await api.delete(`/feedback/${movieId}`);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['history'] });
+    },
+  });
+}

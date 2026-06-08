@@ -8,17 +8,17 @@ import {
 import { useGenres } from '../hooks/useMovies';
 import { GenreChipGroup, MoodChipGroup } from '../components/PreferenceChips';
 import { RecommendationCard } from '../components/RecommendationCard';
-import { useFeedback } from '../hooks/useFeedback';
+import { useFeedback, useDeleteFeedback } from '../hooks/useFeedback';
 import { useAuth } from '../hooks/useAuth';
 import { useMoodTheme } from '../features/mood/MoodThemeContext';
 import type { FeedbackAction, UserPreferences } from '../lib/types';
 
 const MOOD_OPTIONS = [
-  { key: 'Happy',        emoji: '😄', color: '#f59e0b' },
-  { key: 'Tense',        emoji: '😬', color: '#2dd4bf' },
-  { key: 'Relaxing',     emoji: '😌', color: '#b8a4ed' },
-  { key: 'Mind-bending', emoji: '🌀', color: '#a855f7' },
-  { key: 'Romantic',     emoji: '❤️', color: '#fb7185' },
+  { key: 'Happy',        icon: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z', color: '#f59e0b' },
+  { key: 'Tense',        icon: 'M13 10V3L4 14h7v7l9-11h-7z',                                                                                                                         color: '#2dd4bf' },
+  { key: 'Relaxing',     icon: 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z',                                                               color: '#b8a4ed' },
+  { key: 'Mind-bending', icon: 'M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z', color: '#a855f7' },
+  { key: 'Romantic',     icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z',                       color: '#fb7185' },
 ];
 
 function SkeletonCard() {
@@ -64,7 +64,7 @@ function MoodSidebar({ activeMood, onSelect }: MoodSidebarProps) {
                 <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
               </svg>
             </button>
-            {MOOD_OPTIONS.map(({ key, emoji, color }) => {
+            {MOOD_OPTIONS.map(({ key, icon, color }) => {
               const active = activeMood === key;
               return (
                 <button
@@ -72,14 +72,16 @@ function MoodSidebar({ activeMood, onSelect }: MoodSidebarProps) {
                   type="button"
                   onClick={() => onSelect(active ? null : key)}
                   title={key}
-                  className="w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 hover:scale-110"
+                  className="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-200 hover:scale-110"
                   style={
                     active
                       ? { background: color, boxShadow: `0 0 14px ${color}80` }
                       : { background: 'var(--cw-surface)', border: '1px solid var(--cw-border)' }
                   }
                 >
-                  {emoji}
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke={active ? 'white' : color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                    <path d={icon} />
+                  </svg>
                 </button>
               );
             })}
@@ -110,7 +112,7 @@ function MoodSidebar({ activeMood, onSelect }: MoodSidebarProps) {
             <div className="p-3">
               {/* Header */}
               <div className="flex items-center justify-between mb-3">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.15em]">
+                <span className="text-[10px] font-medium text-slate-500 uppercase tracking-[0.15em]">
                   Mood
                 </span>
                 <button
@@ -128,14 +130,14 @@ function MoodSidebar({ activeMood, onSelect }: MoodSidebarProps) {
 
               {/* Mood buttons */}
               <div className="flex flex-col gap-1">
-                {MOOD_OPTIONS.map(({ key, emoji, color }) => {
+                {MOOD_OPTIONS.map(({ key, icon, color }) => {
                   const active = activeMood === key;
                   return (
                     <button
                       key={key}
                       type="button"
                       onClick={() => onSelect(active ? null : key)}
-                      className="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 text-left w-full overflow-hidden"
+                      className="group relative flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-normal transition-all duration-200 text-left w-full overflow-hidden"
                       style={
                         active
                           ? {
@@ -163,7 +165,9 @@ function MoodSidebar({ activeMood, onSelect }: MoodSidebarProps) {
                           style={{ background: 'rgba(255,255,255,0.7)' }}
                         />
                       )}
-                      <span className="text-base leading-none z-10">{emoji}</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0 z-10" fill="none" viewBox="0 0 24 24" stroke={active ? 'white' : color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                        <path d={icon} />
+                      </svg>
                       <span className="z-10">{key}</span>
                     </button>
                   );
@@ -265,6 +269,7 @@ export function RecommendationsPage() {
   const [recommendationRevision, setRecommendationRevision] = useState(0);
   const sidebarDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { mutate: submitFeedback } = useFeedback();
+  const { mutate: deleteFeedback } = useDeleteFeedback();
   const { mutate: savePreferences, isPending: isSavingPreferences } =
     useSaveUserPreferences(authCacheKey);
   // metrics intentionally not shown on the main page — internal eval data
@@ -360,6 +365,20 @@ export function RecommendationsPage() {
     );
   }
 
+  function handleClearVote(tmdbId: number) {
+    const prev = votes.get(tmdbId);
+    setVotes((m) => {
+      const next = new Map(m);
+      next.delete(tmdbId);
+      return next;
+    });
+    deleteFeedback(tmdbId, {
+      onError: () => {
+        if (prev) setVotes((m) => new Map(m).set(tmdbId, prev));
+      },
+    });
+  }
+
   const recommendations = recommendationData?.recommendations ?? [];
   const rateLimited = isAxiosError(recsError) && recsError.response?.status === 429;
 
@@ -415,7 +434,7 @@ export function RecommendationsPage() {
                   className="px-2 py-0.5 rounded-full text-xs font-bold border"
                   style={{ borderColor: 'var(--cw-accent)', color: 'var(--cw-accent)', background: 'var(--cw-accent)15' }}
                 >
-                  {MOOD_OPTIONS.find(m => m.key === activePrefs.mood)?.emoji} {activePrefs.mood}
+                  {(() => { const m = MOOD_OPTIONS.find(o => o.key === activePrefs.mood); return m ? <svg xmlns="http://www.w3.org/2000/svg" className="inline h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d={m.icon} /></svg> : null; })()} {activePrefs.mood}
                 </span>
               )}
               {isSavingPreferences && <span className="text-xs text-slate-500 ml-auto">Saving...</span>}
@@ -488,6 +507,7 @@ export function RecommendationsPage() {
                   item={item}
                   vote={votes.get(item.tmdb_id)}
                   onVote={handleVote}
+                  onClearVote={handleClearVote}
                   showFeedback={isAuthenticated}
                 />
               ))}

@@ -7,6 +7,7 @@ interface FeedbackControlsProps {
   title: string;
   vote?: FeedbackAction;
   onVote: (action: FeedbackAction) => void;
+  onClearVote?: () => void;
   watchCompletion?: WatchCompletion | null;
   onWatchCompletion?: (v: WatchCompletion) => void;
 }
@@ -15,47 +16,56 @@ export function FeedbackControls({
   title,
   vote,
   onVote,
+  onClearVote,
   watchCompletion,
   onWatchCompletion,
 }: FeedbackControlsProps) {
+  function handleClick(action: FeedbackAction) {
+    if (vote === action) {
+      onClearVote?.();
+    } else {
+      onVote(action);
+    }
+  }
+
   return (
     <div
       className="rounded-xl border p-3"
       style={{ background: 'var(--cw-surface-elevated)', borderColor: 'var(--cw-border)' }}
     >
-      <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-400">
+      <p className="mb-2 text-[10px] font-normal uppercase tracking-widest text-slate-400">
         Rate this film
       </p>
       <div className="grid grid-cols-2 gap-2">
         <button
           type="button"
-          onClick={() => onVote('like')}
-          className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-bold transition-all duration-200 ${
+          onClick={() => handleClick('like')}
+          className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-normal transition-all duration-200 ${
             vote === 'like'
               ? 'border-green-500 bg-green-500/20 text-green-300'
               : 'border-white/10 bg-transparent text-slate-400 hover:border-green-500/50 hover:text-green-400'
           }`}
-          aria-label={`Like ${title}`}
+          aria-label={vote === 'like' ? `Remove like from ${title}` : `Like ${title}`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-            <path d="M1 8.998a1 1 0 0 1 1-1h3v9H2a1 1 0 0 1-1-1v-7Zm5.5 8.5h7.168a2 2 0 0 0 1.94-1.516l1.333-5.333A2 2 0 0 0 15 7.498H11V3.498a1.5 1.5 0 0 0-1.5-1.5.5.5 0 0 0-.462.31L6.5 8.498v9Z" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
           </svg>
           Like
         </button>
         <button
           type="button"
-          onClick={() => onVote('dislike')}
-          className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-bold transition-all duration-200 ${
+          onClick={() => handleClick('dislike')}
+          className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-normal transition-all duration-200 ${
             vote === 'dislike'
               ? 'border-red-500 bg-red-500/20 text-red-300'
               : 'border-white/10 bg-transparent text-slate-400 hover:border-red-500/50 hover:text-red-400'
           }`}
-          aria-label={`Mark ${title} as not for me`}
+          aria-label={vote === 'dislike' ? `Remove dislike from ${title}` : `Mark ${title} as not for me`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4" aria-hidden="true">
-            <path d="M19 11.002a1 1 0 0 1-1 1h-3v-9h3a1 1 0 0 1 1 1v7Zm-5.5-8.5H6.332a2 2 0 0 0-1.94 1.516L3.06 9.351a2 2 0 0 0 1.94 2.484H9v3.5a1.5 1.5 0 0 0 1.5 1.5.5.5 0 0 0 .462-.31l2.538-6.023v-9Z" />
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
           </svg>
-          Skip
+          Dislike
         </button>
       </div>
 
