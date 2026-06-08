@@ -14,6 +14,8 @@ from app.services.recommendation_service import (
     build_explanation,
     RecommendationService,
     _apply_interaction_content_feedback,
+    _apply_preference_genre_guard,
+    _apply_recommendable_quality_filter,
     _norm,
     _get_alpha,
 )
@@ -322,6 +324,24 @@ def test_content_feedback_boosts_liked_neighbors():
     assert scores[201] == 6.0
 
 
+def test_content_feedback_does_not_add_unrelated_candidates():
+    """Feedback reranks the current preference candidate set without expanding it."""
+    scores = {200: 1.0}
+    tmdb_ids = [100, 200, 201]
+    top_indices = np.array([[1, 2], [0, 2], [0, 1]], dtype=np.int32)
+
+    _apply_interaction_content_feedback(
+        scores,
+        liked_movie_ids=[100],
+        disliked_movie_ids=[],
+        tmdb_ids=tmdb_ids,
+        top_indices=top_indices,
+        feedback_weight=5.0,
+    )
+
+    assert scores == {200: 6.0}
+
+
 def test_content_feedback_penalizes_disliked_neighbors():
     """A dislike immediately lowers content-neighbor scores."""
     scores = {200: 10.0, 201: 10.0}
@@ -339,6 +359,68 @@ def test_content_feedback_penalizes_disliked_neighbors():
 
     assert scores[200] == 5.0
     assert scores[201] == 5.0
+
+
+def test_preference_genre_guard_filters_when_enough_matches():
+    """Cold-start ranking stays anchored to the selected genre when possible."""
+    scores = {
+        1: 10.0,
+        2: 9.0,
+        3: 8.0,
+        4: 7.0,
+    }
+    docs = [
+        {"tmdb_id": 1, "genres": ["Romance"]},
+        {"tmdb_id": 2, "genres": ["Romance", "Drama"]},
+        {"tmdb_id": 3, "genres": ["Romance", "Comedy"]},
+        {"tmdb_id": 4, "genres": ["Action"]},
+    ]
+
+    _apply_preference_genre_guard(scores, docs, ["Romance"], top_k=3)
+
+    assert set(scores) == {1, 2, 3}
+
+
+def test_preference_genre_guard_penalizes_when_matches_are_sparse():
+    """Sparse data can still return fillers, but genre matches are promoted."""
+    scores = {1: 10.0, 2: 10.0}
+    docs = [
+        {"tmdb_id": 1, "genres": ["Romance"]},
+        {"tmdb_id": 2, "genres": ["Action"]},
+    ]
+
+    _apply_preference_genre_guard(scores, docs, ["Romance"], top_k=3)
+
+    assert scores[1] > scores[2]
+
+
+def test_recommendable_quality_filter_removes_low_signal_when_enough_candidates():
+    """Low-vote or zero-rating movies are removed when enough better candidates exist."""
+    scores = {1: 5.0, 2: 5.0, 3: 5.0, 4: 5.0}
+    docs = [
+        {"tmdb_id": 1, "rating": 7.0, "vote_count": 100},
+        {"tmdb_id": 2, "rating": 6.0, "vote_count": 80},
+        {"tmdb_id": 3, "rating": 0.0, "vote_count": 0},
+        {"tmdb_id": 4, "rating": 8.0, "vote_count": 2},
+    ]
+
+    _apply_recommendable_quality_filter(scores, docs, top_k=2)
+
+    assert set(scores) == {1, 2}
+
+
+def test_recommendable_quality_filter_removes_unsafe_titles():
+    """Demo recommendations should not surface obviously mature catalog titles."""
+    scores = {1: 5.0, 2: 5.0, 3: 5.0}
+    docs = [
+        {"tmdb_id": 1, "title": "Clean Documentary", "rating": 7.0, "vote_count": 100},
+        {"tmdb_id": 2, "title": "Another Clean Film", "rating": 6.5, "vote_count": 80},
+        {"tmdb_id": 3, "title": "X-Rated History", "rating": 7.5, "vote_count": 200},
+    ]
+
+    _apply_recommendable_quality_filter(scores, docs, top_k=2)
+
+    assert set(scores) == {1, 2}
 
 
 # ---------------------------------------------------------------------------

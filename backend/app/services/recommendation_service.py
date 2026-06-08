@@ -53,7 +53,9 @@ def _apply_interaction_content_feedback(
 ) -> None:
     """Apply immediate content-neighbour feedback before CF threshold is reached.
 
-    Likes boost movies similar to the liked item; dislikes penalise them.
+    Likes boost matching candidates similar to the liked item. Dislikes penalize
+    matching candidates similar to the disliked item. Feedback should rerank the
+    current preference context, not introduce movies from unrelated genres.
     When top_scores are available, the adjustment is further weighted by the
     actual cosine similarity so that closer neighbours are affected more.
     """
@@ -68,10 +70,9 @@ def _apply_interaction_content_feedback(
             continue
         for j, neighbor_idx in enumerate(top_indices[liked_idx]):
             neighbor_id = tmdb_ids[int(neighbor_idx)]
-            sim = float(top_scores[liked_idx][j]) if top_scores is not None else 1.0
-            candidate_scores[neighbor_id] = (
-                candidate_scores.get(neighbor_id, 0.0) + feedback_weight * sim
-            )
+            if neighbor_id in candidate_scores:
+                sim = float(top_scores[liked_idx][j]) if top_scores is not None else 1.0
+                candidate_scores[neighbor_id] += feedback_weight * sim
 
     for disliked_id in disliked_movie_ids:
         disliked_idx = id_to_idx.get(disliked_id)
@@ -92,6 +93,16 @@ MOOD_GENRE_MAP = {
     "Mind-bending": ["Science Fiction", "Mystery", "Fantasy"],
 }
 MOOD_BOOST = 1.6
+SELECTED_GENRE_BOOST = 2.0
+NON_MATCHING_GENRE_PENALTY = 0.25
+MIN_RECOMMENDATION_VOTE_COUNT = 50
+LOW_QUALITY_PENALTY = 0.1
+UNSAFE_TITLE_TERMS = (
+    "adult",
+    "erotic",
+    "porn",
+    "x-rated",
+)
 TOP_K = 10
 # Max genre-seed movies: only use high-quality films as seeds to reduce noise
 _SEED_LIMIT = 300
@@ -244,6 +255,84 @@ def _score_with_preference_embedding(
     return candidate_scores
 
 
+def _apply_preference_genre_guard(
+    candidate_scores: dict[int, float],
+    candidate_docs: list[dict],
+    selected_genres: list[str],
+    top_k: int = TOP_K,
+) -> None:
+    """Keep cold-start recommendations anchored to the user's selected genres.
+
+    Similarity neighbors can include broadly related movies that do not actually
+    match the selected genre. If enough genre-matching candidates exist, remove
+    non-matching candidates. Otherwise, boost matches and penalize non-matches so
+    sparse test/demo data can still return a full list.
+    """
+    selected = set(selected_genres)
+    if not selected or not candidate_scores:
+        return
+
+    matching_ids = {
+        doc["tmdb_id"]
+        for doc in candidate_docs
+        if set(doc.get("genres", [])) & selected
+    }
+
+    if len(matching_ids) >= top_k:
+        for tmdb_id in list(candidate_scores):
+            if tmdb_id not in matching_ids:
+                candidate_scores.pop(tmdb_id, None)
+        return
+
+    for tmdb_id in list(candidate_scores):
+        if tmdb_id in matching_ids:
+            candidate_scores[tmdb_id] *= SELECTED_GENRE_BOOST
+        else:
+            candidate_scores[tmdb_id] *= NON_MATCHING_GENRE_PENALTY
+
+
+def _is_recommendable_quality(doc: dict) -> bool:
+    """Return whether a movie has enough public signal for demo-safe ranking."""
+    if doc.get("adult") is True:
+        return False
+    title = (doc.get("title") or "").casefold()
+    if any(term in title for term in UNSAFE_TITLE_TERMS):
+        return False
+    rating = doc.get("rating")
+    vote_count = doc.get("vote_count")
+    if rating is not None and rating <= 0:
+        return False
+    if vote_count is not None and vote_count < MIN_RECOMMENDATION_VOTE_COUNT:
+        return False
+    return True
+
+
+def _apply_recommendable_quality_filter(
+    candidate_scores: dict[int, float],
+    candidate_docs: list[dict],
+    top_k: int = TOP_K,
+) -> None:
+    """Prefer movies with enough vote signal; keep sparse fixtures usable."""
+    if not candidate_scores:
+        return
+
+    recommendable_ids = {
+        doc["tmdb_id"]
+        for doc in candidate_docs
+        if _is_recommendable_quality(doc)
+    }
+
+    if len(recommendable_ids) >= top_k:
+        for tmdb_id in list(candidate_scores):
+            if tmdb_id not in recommendable_ids:
+                candidate_scores.pop(tmdb_id, None)
+        return
+
+    for tmdb_id in list(candidate_scores):
+        if tmdb_id not in recommendable_ids:
+            candidate_scores[tmdb_id] *= LOW_QUALITY_PENALTY
+
+
 class RecommendationService:
     """Generates top-K recommendations using precomputed similarity index."""
 
@@ -378,19 +467,26 @@ class RecommendationService:
                     sim = float(top_scores[idx][j]) if top_scores is not None else 1.0
                     candidate_scores[neighbor_id] = candidate_scores.get(neighbor_id, 0.0) + sim
 
-        # Apply mood boost
+        candidate_ids = list(candidate_scores.keys())
+        candidate_docs = []
+        if candidate_ids:
+            cand_cursor = self._db.movies.find(
+                {"tmdb_id": {"$in": candidate_ids}},
+                {"tmdb_id": 1, "title": 1, "genres": 1, "rating": 1, "vote_count": 1, "adult": 1},
+            )
+            candidate_docs = await cand_cursor.to_list(length=None)
+
+        _apply_preference_genre_guard(candidate_scores, candidate_docs, genres)
+        _apply_recommendable_quality_filter(candidate_scores, candidate_docs)
+
+        # Apply mood boost after the selected genre guard so mood refines the
+        # preference instead of replacing it with broad genres like Drama.
         if mood and mood in MOOD_GENRE_MAP:
             boost_genres = set(MOOD_GENRE_MAP[mood])
-            candidate_ids = list(candidate_scores.keys())
-            if candidate_ids:
-                cand_cursor = self._db.movies.find(
-                    {"tmdb_id": {"$in": candidate_ids}},
-                    {"tmdb_id": 1, "genres": 1},
-                )
-                cand_docs = await cand_cursor.to_list(length=None)
-                for cdoc in cand_docs:
-                    if set(cdoc.get("genres", [])) & boost_genres:
-                        candidate_scores[cdoc["tmdb_id"]] *= MOOD_BOOST
+            for cdoc in candidate_docs:
+                tmdb_id = cdoc["tmdb_id"]
+                if tmdb_id in candidate_scores and set(cdoc.get("genres", [])) & boost_genres:
+                    candidate_scores[tmdb_id] *= MOOD_BOOST
 
         # --- Hybrid blending ---
         alpha = 1.0
