@@ -29,3 +29,14 @@ class UserRepository:
         """Insert *user_data* and return the new document's ID as a string."""
         result = await self.collection.insert_one(user_data)
         return str(result.inserted_id)
+
+    async def find_by_id(self, user_id: str) -> dict | None:
+        from bson import ObjectId
+        return await self.collection.find_one({"_id": ObjectId(user_id)})
+
+    async def update_profile(self, user_id: str, fields: dict) -> None:
+        from bson import ObjectId
+        await self.collection.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$set": fields},
+        )

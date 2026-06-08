@@ -57,6 +57,7 @@ def _to_summary(doc: dict) -> dict:
         "year": doc.get("year"),
         "genres": doc.get("genres", []),
         "poster_path": doc.get("poster_path"),
+        "backdrop_path": doc.get("backdrop_path"),
         "rating": doc.get("rating"),
     }
 

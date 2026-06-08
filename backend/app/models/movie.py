@@ -11,6 +11,7 @@ class MovieSummary(BaseModel):
     year: int | None = None
     genres: list[str] = []
     poster_path: str | None = None
+    backdrop_path: str | None = None
     rating: float | None = None
 
 

@@ -13,7 +13,7 @@ class AuthService:
     def __init__(self, db) -> None:
         self._repo = UserRepository(db)
 
-    async def register(self, email: str, password: str) -> dict:
+    async def register(self, email: str, password: str, first_name: str | None = None, last_name: str | None = None) -> dict:
         """Register a new user.
 
         Raises:
@@ -32,6 +32,8 @@ class AuthService:
             "email": email,
             "hashed_password": hash_password(password),
             "created_at": datetime.now(timezone.utc),
+            **({"first_name": first_name} if first_name else {}),
+            **({"last_name": last_name} if last_name else {}),
         }
         user_id = await self._repo.create(user_doc)
         return {"id": user_id, "email": email}

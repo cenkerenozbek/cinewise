@@ -7,6 +7,8 @@ class UserCreate(BaseModel):
 
     email: EmailStr
     password: str
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class UserResponse(BaseModel):
@@ -14,6 +16,22 @@ class UserResponse(BaseModel):
 
     id: str
     email: str
+
+
+class UserProfile(BaseModel):
+    """Response body for GET /api/auth/profile."""
+
+    id: str
+    email: str
+    first_name: str | None = None
+    last_name: str | None = None
+
+
+class UserProfileUpdate(BaseModel):
+    """Request body for PATCH /api/auth/profile."""
+
+    first_name: str | None = None
+    last_name: str | None = None
 
 
 class TokenResponse(BaseModel):

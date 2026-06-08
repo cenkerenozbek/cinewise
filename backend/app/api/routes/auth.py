@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.database import get_db
 from app.core.security import get_current_user
-from app.models.user import TokenResponse, UserCreate, UserResponse
+from app.models.user import TokenResponse, UserCreate, UserProfile, UserProfileUpdate, UserResponse
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -26,7 +26,7 @@ async def register(
     service: AuthService = Depends(_get_auth_service),
 ) -> UserResponse:
     """Register a new user and return the created user's id and email."""
-    result = await service.register(body.email, body.password)
+    result = await service.register(body.email, body.password, body.first_name, body.last_name)
     return UserResponse(id=result["id"], email=result["email"])
 
 
@@ -44,3 +44,35 @@ async def login(
 async def me(user_id: str = Depends(get_current_user)) -> dict:
     """Return the authenticated user's ID. Requires a valid Bearer token."""
     return {"user_id": user_id}
+
+
+@router.get("/profile", response_model=UserProfile)
+async def get_profile(
+    user_id: str = Depends(get_current_user),
+    service: AuthService = Depends(_get_auth_service),
+) -> UserProfile:
+    doc = await service._repo.find_by_id(user_id)
+    return UserProfile(
+        id=user_id,
+        email=doc["email"],
+        first_name=doc.get("first_name"),
+        last_name=doc.get("last_name"),
+    )
+
+
+@router.patch("/profile", response_model=UserProfile)
+async def update_profile(
+    body: UserProfileUpdate,
+    user_id: str = Depends(get_current_user),
+    service: AuthService = Depends(_get_auth_service),
+) -> UserProfile:
+    fields = {k: v for k, v in body.model_dump().items() if v is not None}
+    if fields:
+        await service._repo.update_profile(user_id, fields)
+    doc = await service._repo.find_by_id(user_id)
+    return UserProfile(
+        id=user_id,
+        email=doc["email"],
+        first_name=doc.get("first_name"),
+        last_name=doc.get("last_name"),
+    )

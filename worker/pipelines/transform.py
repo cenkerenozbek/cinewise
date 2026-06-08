@@ -39,6 +39,7 @@ def transform_movie(tmdb_data: dict) -> dict:
         "genres": genres,
         "overview": tmdb_data.get("overview") or None,
         "poster_path": tmdb_data.get("poster_path"),
+        "backdrop_path": tmdb_data.get("backdrop_path"),
         "rating": tmdb_data.get("vote_average"),
         "vote_count": tmdb_data.get("vote_count"),
         "popularity": tmdb_data.get("popularity"),
