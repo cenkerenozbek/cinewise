@@ -7,7 +7,7 @@ import { useProfile } from '../hooks/useProfile';
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuthContext();
   const { isDark, toggleTheme } = useMoodTheme();
-  const { data: profile } = useProfile();
+  const { data: profile } = useProfile({ enabled: isAuthenticated });
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();

@@ -9,13 +9,14 @@ export interface UserProfile {
   avatar_id: string | null;
 }
 
-export function useProfile() {
+export function useProfile(options?: { enabled?: boolean }) {
   return useQuery<UserProfile>({
     queryKey: ['profile'],
     queryFn: async () => {
       const { data } = await api.get<UserProfile>('/auth/profile');
       return data;
     },
+    enabled: options?.enabled ?? true,
   });
 }
 
