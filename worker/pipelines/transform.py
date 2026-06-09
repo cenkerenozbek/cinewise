@@ -46,5 +46,7 @@ def transform_movie(tmdb_data: dict) -> dict:
         "original_language": tmdb_data.get("original_language"),
         "director": director,
         "cast": cast,
+        "tagline": tmdb_data.get("tagline") or None,
+        "keywords": [kw["name"] for kw in tmdb_data.get("keywords", {}).get("keywords", [])],
         "ingested_at": datetime.now(timezone.utc),
     }

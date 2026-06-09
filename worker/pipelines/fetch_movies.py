@@ -53,5 +53,5 @@ async def fetch_movie_details(client: httpx.AsyncClient, movie_id: int) -> dict:
     return await fetch_tmdb(
         client,
         f"/movie/{movie_id}",
-        {"append_to_response": "credits,translations", "language": "en-US"},
+        {"append_to_response": "credits,translations,keywords", "language": "en-US"},
     )
