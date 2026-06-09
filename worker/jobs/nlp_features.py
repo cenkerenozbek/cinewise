@@ -19,6 +19,7 @@ import os
 import re
 import sys
 
+import httpx
 import joblib
 import numpy as np
 from dotenv import load_dotenv
@@ -35,11 +36,16 @@ def preprocess_text(
     genres: list[str],
     cast: list[str] | None = None,
     director: str | None = None,
+    tagline: str | None = None,
+    keywords: list[str] | None = None,
 ) -> str:
-    """Build composite text from movie overview, genres, cast, and director.
+    """Build composite text from movie metadata for semantic embedding.
 
-    Cast and director are repeated twice (×2 weight) so they exert stronger
-    influence on the semantic embedding than the overview alone.
+    Weighting strategy (repetition = higher influence):
+    - tagline ×3: dense semantic signal in few words
+    - keywords ×2: curated descriptive tags
+    - director ×2, cast ×2: strong collaborative signal
+    - genres ×1, overview ×1: broad context
     """
     text = overview or ""
     text = html.unescape(text)
@@ -48,6 +54,12 @@ def preprocess_text(
     parts = [text] if text else []
     if genres:
         parts.append(" ".join(genres))
+    if tagline:
+        clean_tagline = re.sub(r"\s+", " ", html.unescape(tagline)).strip()
+        parts.extend([clean_tagline] * 3)  # ×3 weight
+    if keywords:
+        kw_str = " ".join(keywords[:20])
+        parts.extend([kw_str, kw_str])  # ×2 weight
     if cast:
         cast_str = " ".join(cast[:5])
         parts.extend([cast_str, cast_str])  # ×2 weight
@@ -64,8 +76,8 @@ def build_semantic_embeddings(texts: list[str]) -> np.ndarray:
     """
     from sentence_transformers import SentenceTransformer  # lazy import
 
-    logger.info("Loading sentence-transformers model all-MiniLM-L6-v2 ...")
-    model = SentenceTransformer("all-MiniLM-L6-v2")
+    logger.info("Loading sentence-transformers model all-mpnet-base-v2 ...")
+    model = SentenceTransformer("all-mpnet-base-v2")
     logger.info(f"Encoding {len(texts)} movie texts (batch_size=64) ...")
     embeddings = model.encode(
         texts,
@@ -150,7 +162,7 @@ async def main() -> None:
     logger.info("Reading movie documents from MongoDB ...")
     cursor = db.movies.find(
         {},
-        {"tmdb_id": 1, "overview": 1, "genres": 1, "cast": 1, "director": 1},
+        {"tmdb_id": 1, "overview": 1, "genres": 1, "cast": 1, "director": 1, "tagline": 1, "keywords": 1},
     )
     docs = await cursor.to_list(length=None)
     logger.info(f"Loaded {len(docs)} movie documents")
@@ -161,6 +173,8 @@ async def main() -> None:
             d.get("genres", []),
             d.get("cast"),
             d.get("director"),
+            d.get("tagline"),
+            d.get("keywords"),
         )
         for d in docs
     ]
@@ -177,6 +191,14 @@ async def main() -> None:
     logger.info(f"NLP pipeline complete for {len(docs)} movies")
 
     client.close()
+
+    backend_url = os.environ.get("BACKEND_URL", "http://backend:8000")
+    try:
+        with httpx.Client(timeout=30) as http:
+            resp = http.post(f"{backend_url}/api/admin/reload")
+            logger.info("Backend reload triggered: %s", resp.json())
+    except Exception as _reload_err:
+        logger.warning("Could not trigger backend reload (%s) — restart backend manually", _reload_err)
 
 
 if __name__ == "__main__":
