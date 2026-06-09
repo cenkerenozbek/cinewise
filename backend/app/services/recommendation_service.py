@@ -295,6 +295,8 @@ def _is_recommendable_quality(doc: dict) -> bool:
     """Return whether a movie has enough public signal for demo-safe ranking."""
     if doc.get("adult") is True:
         return False
+    if "TV Movie" in (doc.get("genres") or []):
+        return False
     title = (doc.get("title") or "").casefold()
     if any(term in title for term in UNSAFE_TITLE_TERMS):
         return False
@@ -333,6 +335,46 @@ def _apply_recommendable_quality_filter(
             candidate_scores[tmdb_id] *= LOW_QUALITY_PENALTY
 
 
+ANIME_LANGUAGES = {"ja"}
+ANIME_PENALTY = 0.15
+
+
+def _apply_anime_filter(
+    candidate_scores: dict[int, float],
+    candidate_docs: list[dict],
+    selected_genres: list[str],
+    top_k: int = TOP_K,
+) -> None:
+    """Suppress Japanese-language animation when user selected Animation genre.
+
+    Anime dominates TMDB's Animation catalogue. When the user picks Animation
+    without explicitly wanting anime, penalise ja-language films heavily so
+    western/international animation ranks higher. Uses the same soft/hard
+    pattern as the quality filter: hard-remove if enough non-anime candidates
+    exist, otherwise apply a score penalty so the list can still fill top_k.
+    """
+    if "Animation" not in selected_genres:
+        return
+    if not candidate_scores:
+        return
+
+    non_anime_ids = {
+        doc["tmdb_id"]
+        for doc in candidate_docs
+        if doc.get("original_language") not in ANIME_LANGUAGES
+    }
+
+    if len(non_anime_ids) >= top_k:
+        for tmdb_id in list(candidate_scores):
+            if tmdb_id not in non_anime_ids:
+                candidate_scores.pop(tmdb_id, None)
+        return
+
+    for tmdb_id in list(candidate_scores):
+        if tmdb_id not in non_anime_ids:
+            candidate_scores[tmdb_id] *= ANIME_PENALTY
+
+
 class RecommendationService:
     """Generates top-K recommendations using precomputed similarity index."""
 
@@ -364,7 +406,7 @@ class RecommendationService:
 
         catalog_cursor = self._db.movies.find(
             {"tmdb_id": {"$in": tmdb_ids}},
-            {"tmdb_id": 1, "genres": 1, "rating": 1, "vote_count": 1},
+            {"tmdb_id": 1, "genres": 1, "rating": 1, "vote_count": 1, "original_language": 1},
         )
         catalog_docs = await catalog_cursor.to_list(length=None)
 
@@ -472,12 +514,13 @@ class RecommendationService:
         if candidate_ids:
             cand_cursor = self._db.movies.find(
                 {"tmdb_id": {"$in": candidate_ids}},
-                {"tmdb_id": 1, "title": 1, "genres": 1, "rating": 1, "vote_count": 1, "adult": 1},
+                {"tmdb_id": 1, "title": 1, "genres": 1, "rating": 1, "vote_count": 1, "adult": 1, "original_language": 1},
             )
             candidate_docs = await cand_cursor.to_list(length=None)
 
         _apply_preference_genre_guard(candidate_scores, candidate_docs, genres)
         _apply_recommendable_quality_filter(candidate_scores, candidate_docs)
+        _apply_anime_filter(candidate_scores, candidate_docs, genres)
 
         # Apply mood boost after the selected genre guard so mood refines the
         # preference instead of replacing it with broad genres like Drama.
