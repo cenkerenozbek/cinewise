@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useMovieSearch, useMovieDetail, useMovieTrailer } from '../hooks/useMovies';
 import { useRecommendations, useUserPreferences } from '../hooks/useRecommendations';
@@ -38,7 +38,7 @@ function HeroSlide({ movie }: { movie: MovieSummary }) {
   );
 }
 
-function HeroSection({ movies }: { movies: MovieSummary[] }) {
+function HeroSection({ movies, personalized = false }: { movies: MovieSummary[]; personalized?: boolean }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -93,6 +93,14 @@ function HeroSection({ movies }: { movies: MovieSummary[] }) {
       <div className="absolute bottom-16 left-[98px] max-w-[420px]">
         {movie ? (
           <>
+            {personalized && (
+              <div className="inline-flex items-center gap-1.5 mb-3 px-3 py-1 rounded-full text-xs font-semibold" style={{ background: 'var(--cw-accent)', color: '#fff', opacity: 0.92 }}>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                For You
+              </div>
+            )}
             <h1 className="text-5xl font-black leading-tight mb-5 transition-all duration-500" style={{ color: '#ffffff' }}>
               {movie.title}
             </h1>
@@ -295,6 +303,35 @@ export function HomePage() {
   function handleGenreChange(value: string) { setGenre(value); setPage(1); }
   function handleYearChange(value: string) { setYear(value); setPage(1); }
 
+  // All derived values — must live before any early return to respect Rules of Hooks
+  const recMovies: MovieSummary[] = personalizedRecommendations.map((r) => ({
+    tmdb_id: r.tmdb_id,
+    title: r.title,
+    title_tr: r.title_tr,
+    year: r.year,
+    genres: r.genres,
+    poster_path: r.poster_path,
+    backdrop_path: r.backdrop_path,
+    rating: r.rating,
+  }));
+  const usePersonalizedHero = shouldShowPersonalized && recMovies.length >= HERO_COUNT;
+  const shuffledRecMovies = useMemo(() => {
+    if (!usePersonalizedHero) return recMovies;
+    const pool = recMovies.slice(0, Math.min(recMovies.length, 10));
+    const shuffled = [...pool];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usePersonalizedHero, recMovies.length]);
+  const heroMovies = usePersonalizedHero ? shuffledRecMovies.slice(0, HERO_COUNT) : movies.slice(0, HERO_COUNT);
+  const forYouRowMovies = usePersonalizedHero ? recMovies.slice(HERO_COUNT) : recMovies;
+  const featuredMovies = movies.slice(HERO_COUNT, HERO_COUNT + 8);
+  const newArrivals = movies.slice(HERO_COUNT + 8, HERO_COUNT + 16);
+  const bgColor = isDark ? 'var(--cw-bg)' : '#ffffff';
+
   // Search / filter mode → show grid view
   if (isSearching) {
     return (
@@ -332,16 +369,10 @@ export function HomePage() {
     );
   }
 
-  // Cinewise layout
-  const heroMovies = movies.slice(0, HERO_COUNT);
-  const featuredMovies = movies.slice(HERO_COUNT, HERO_COUNT + 8);
-  const newArrivals = movies.slice(HERO_COUNT + 8, HERO_COUNT + 16);
-  const bgColor = isDark ? 'var(--cw-bg)' : '#ffffff';
-
   return (
     <div style={{ background: bgColor }}>
       {/* Hero */}
-      <HeroSection movies={heroMovies} />
+      <HeroSection movies={heroMovies} personalized={usePersonalizedHero} />
 
       {/* Main content */}
       <div className="max-w-[1400px] mx-auto px-[98px] py-16">
@@ -367,22 +398,11 @@ export function HomePage() {
 
         {shouldShowPersonalized && (
           <section className="mb-14">
-            <SectionTitle title="For You" linkTo="/recommendations" />
+            <SectionTitle title={usePersonalizedHero ? "More For You" : "For You"} linkTo="/recommendations" />
             {personalizedLoading ? (
               <MovieRow movies={[]} loading />
-            ) : personalizedRecommendations.length > 0 ? (
-              <MovieRow
-                movies={personalizedRecommendations.map((r) => ({
-                  tmdb_id: r.tmdb_id,
-                  title: r.title,
-                  title_tr: r.title_tr,
-                  year: r.year,
-                  genres: r.genres,
-                  poster_path: r.poster_path,
-                  backdrop_path: r.backdrop_path,
-                  rating: r.rating,
-                }))}
-              />
+            ) : forYouRowMovies.length > 0 ? (
+              <MovieRow movies={forYouRowMovies} />
             ) : null}
           </section>
         )}
