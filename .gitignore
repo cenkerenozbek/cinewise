@@ -35,3 +35,14 @@ Thumbs.db
 
 # PDF and large binary files
 *.pdf
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Local data and generated outputs
+data/
+outputs/
+
+# Claude Code session data
+.claude/
