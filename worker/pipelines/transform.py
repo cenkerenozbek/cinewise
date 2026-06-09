@@ -43,6 +43,7 @@ def transform_movie(tmdb_data: dict) -> dict:
         "rating": tmdb_data.get("vote_average"),
         "vote_count": tmdb_data.get("vote_count"),
         "popularity": tmdb_data.get("popularity"),
+        "original_language": tmdb_data.get("original_language"),
         "director": director,
         "cast": cast,
         "ingested_at": datetime.now(timezone.utc),

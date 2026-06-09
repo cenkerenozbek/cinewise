@@ -52,9 +52,20 @@ async def main():
         movie_ids = await fetch_movie_ids(http_client, target_count=target_count)
         logger.info(f"Found {len(movie_ids)} unique movie IDs")
 
+        existing = await collection.distinct("tmdb_id", {"tmdb_id": {"$in": movie_ids}})
+        existing_set = set(existing)
+        new_ids = [mid for mid in movie_ids if mid not in existing_set]
+        logger.info(f"Skipping {len(existing_set)} existing movies, ingesting {len(new_ids)} new")
+
+        if not new_ids:
+            logger.info("Nothing new to ingest. Sleeping 6 hours.")
+            client.close()
+            await asyncio.sleep(6 * 3600)
+            return
+
         success = 0
         errors = 0
-        for i, movie_id in enumerate(movie_ids, 1):
+        for i, movie_id in enumerate(new_ids, 1):
             try:
                 details = await fetch_movie_details(http_client, movie_id)
                 movie_doc = transform_movie(details)
@@ -67,7 +78,7 @@ async def main():
             if i % 100 == 0:
                 elapsed = time.time() - start_time
                 logger.info(
-                    f"Progress: {i}/{len(movie_ids)} | "
+                    f"Progress: {i}/{len(new_ids)} | "
                     f"Success: {success} | Errors: {errors} | "
                     f"Elapsed: {elapsed:.0f}s"
                 )
