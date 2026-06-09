@@ -404,11 +404,8 @@ class RecommendationService:
 
         id_to_idx = {tid: i for i, tid in enumerate(tmdb_ids)}
 
-        catalog_cursor = self._db.movies.find(
-            {"tmdb_id": {"$in": tmdb_ids}},
-            {"tmdb_id": 1, "genres": 1, "rating": 1, "vote_count": 1, "original_language": 1},
-        )
-        catalog_docs = await catalog_cursor.to_list(length=None)
+        catalog_cache: dict = getattr(self._state, "catalog_cache", {})
+        catalog_docs = list(catalog_cache.values()) if catalog_cache else []
 
         # Find seed movies matching user's genre preferences.
         # Prefer popular films (vote_count threshold) to reduce noise; fall back
@@ -510,13 +507,7 @@ class RecommendationService:
                     candidate_scores[neighbor_id] = candidate_scores.get(neighbor_id, 0.0) + sim
 
         candidate_ids = list(candidate_scores.keys())
-        candidate_docs = []
-        if candidate_ids:
-            cand_cursor = self._db.movies.find(
-                {"tmdb_id": {"$in": candidate_ids}},
-                {"tmdb_id": 1, "title": 1, "genres": 1, "rating": 1, "vote_count": 1, "adult": 1, "original_language": 1},
-            )
-            candidate_docs = await cand_cursor.to_list(length=None)
+        candidate_docs = [catalog_cache[tid] for tid in candidate_ids if tid in catalog_cache]
 
         _apply_preference_genre_guard(candidate_scores, candidate_docs, genres)
         _apply_recommendable_quality_filter(candidate_scores, candidate_docs)
@@ -555,8 +546,14 @@ class RecommendationService:
             # History reranks the active genre/mood pool; it must not dominate
             # the current explicit request or make recommendations feel fixed.
             history_weight = _HISTORY_SIGNAL_WEIGHT
-            if top_indices is not None:
+            faiss_index = getattr(self._state, "faiss_index", None)
+            _use_faiss = faiss_index is not None and movie_embeddings is not None
+            _use_topk = not _use_faiss and top_indices is not None
+
+            if _use_faiss or _use_topk:
                 history_scores: dict[int, float] = {}
+                _FAISS_NEIGHBORS = 500
+
                 for liked_id in liked_movie_ids:
                     liked_idx = id_to_idx.get(liked_id)
                     if liked_idx is None:
@@ -565,30 +562,58 @@ class RecommendationService:
                     weight = history_weight * _get_completion_weight(completion)
                     if weight <= 0:
                         continue
-                    for j, neighbor_idx in enumerate(top_indices[liked_idx]):
-                        neighbor_id = tmdb_ids[int(neighbor_idx)]
-                        if neighbor_id not in candidate_scores:
-                            continue
-                        sim = float(top_scores[liked_idx][j]) if top_scores is not None else 1.0
-                        history_scores[neighbor_id] = (
-                            history_scores.get(neighbor_id, 0.0) + weight * sim
-                        )
+                    if _use_faiss:
+                        query = movie_embeddings[liked_idx : liked_idx + 1]
+                        sims_arr, idx_arr = faiss_index.search(query, _FAISS_NEIGHBORS + 1)
+                        for j in range(idx_arr.shape[1]):
+                            neighbor_idx = int(idx_arr[0][j])
+                            if neighbor_idx < 0 or neighbor_idx == liked_idx:
+                                continue
+                            neighbor_id = tmdb_ids[neighbor_idx]
+                            if neighbor_id not in candidate_scores:
+                                continue
+                            sim = float(sims_arr[0][j])
+                            history_scores[neighbor_id] = (
+                                history_scores.get(neighbor_id, 0.0) + weight * sim
+                            )
+                    else:
+                        for j, neighbor_idx in enumerate(top_indices[liked_idx]):
+                            neighbor_id = tmdb_ids[int(neighbor_idx)]
+                            if neighbor_id not in candidate_scores:
+                                continue
+                            sim = float(top_scores[liked_idx][j]) if top_scores is not None else 1.0
+                            history_scores[neighbor_id] = (
+                                history_scores.get(neighbor_id, 0.0) + weight * sim
+                            )
 
                 for disliked_id in disliked_movie_ids:
                     disliked_idx = id_to_idx.get(disliked_id)
                     if disliked_idx is None:
                         continue
-                    for j, neighbor_idx in enumerate(top_indices[disliked_idx]):
-                        neighbor_id = tmdb_ids[int(neighbor_idx)]
-                        if neighbor_id in candidate_scores:
-                            sim = (
-                                float(top_scores[disliked_idx][j])
-                                if top_scores is not None
-                                else 1.0
-                            )
-                            history_scores[neighbor_id] = (
-                                history_scores.get(neighbor_id, 0.0) - history_weight * sim
-                            )
+                    if _use_faiss:
+                        query = movie_embeddings[disliked_idx : disliked_idx + 1]
+                        _, idx_arr = faiss_index.search(query, _FAISS_NEIGHBORS + 1)
+                        for j in range(idx_arr.shape[1]):
+                            neighbor_idx = int(idx_arr[0][j])
+                            if neighbor_idx < 0 or neighbor_idx == disliked_idx:
+                                continue
+                            neighbor_id = tmdb_ids[neighbor_idx]
+                            if neighbor_id in candidate_scores:
+                                history_scores[neighbor_id] = (
+                                    history_scores.get(neighbor_id, 0.0) - history_weight
+                                )
+                    else:
+                        for j, neighbor_idx in enumerate(top_indices[disliked_idx]):
+                            neighbor_id = tmdb_ids[int(neighbor_idx)]
+                            if neighbor_id in candidate_scores:
+                                sim = (
+                                    float(top_scores[disliked_idx][j])
+                                    if top_scores is not None
+                                    else 1.0
+                                )
+                                history_scores[neighbor_id] = (
+                                    history_scores.get(neighbor_id, 0.0) - history_weight * sim
+                                )
 
                 max_history = max((abs(v) for v in history_scores.values()), default=0.0)
                 if max_history > 0:
@@ -653,8 +678,7 @@ class RecommendationService:
         if not top_ids:
             return RecommendationResponse(recommendations=[])
 
-        docs = await self._db.movies.find({"tmdb_id": {"$in": top_ids}}).to_list(length=None)
-        doc_map = {d["tmdb_id"]: d for d in docs}
+        doc_map = {tid: catalog_cache[tid] for tid in top_ids if tid in catalog_cache}
         explanation = build_explanation(genres, mood)
 
         return RecommendationResponse(
