@@ -5,7 +5,7 @@ Endpoints:
 - POST /api/auth/login     — Authenticate and receive a JWT access token
 - GET  /api/auth/me        — Return current user ID (protected)
 """
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.database import get_db
@@ -25,6 +25,7 @@ def _get_auth_service(db=Depends(get_db)) -> AuthService:
 @limiter.limit("10/minute")
 async def register(
     request: Request,
+    response: Response,
     body: UserCreate,
     service: AuthService = Depends(_get_auth_service),
 ) -> UserResponse:
@@ -37,6 +38,7 @@ async def register(
 @limiter.limit("10/minute")
 async def login(
     request: Request,
+    response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
     service: AuthService = Depends(_get_auth_service),
 ) -> TokenResponse:
