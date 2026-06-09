@@ -6,7 +6,8 @@ Endpoints:
 - GET /api/movies/{tmdb_id}    — Return full movie detail
 - GET /api/movies/{tmdb_id}/trailer — Return YouTube trailer key from TMDB
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
+from typing import Annotated
 import httpx
 
 from app.core.config import settings
@@ -26,8 +27,8 @@ async def list_movies(
     q: str | None = None,
     genre: str | None = None,
     year: int | None = None,
-    page: int = 1,
-    page_size: int = 20,
+    page: Annotated[int, Query(ge=1)] = 1,
+    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
     service: MovieService = Depends(_get_movie_service),
 ) -> MovieListResponse:
     """Return a paginated list of movies.

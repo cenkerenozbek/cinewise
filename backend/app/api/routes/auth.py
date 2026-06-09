@@ -5,10 +5,11 @@ Endpoints:
 - POST /api/auth/login     — Authenticate and receive a JWT access token
 - GET  /api/auth/me        — Return current user ID (protected)
 """
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.database import get_db
+from app.core.limiter import limiter
 from app.core.security import get_current_user
 from app.models.user import TokenResponse, UserCreate, UserProfile, UserProfileUpdate, UserResponse
 from app.services.auth_service import AuthService
@@ -21,7 +22,9 @@ def _get_auth_service(db=Depends(get_db)) -> AuthService:
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/minute")
 async def register(
+    request: Request,
     body: UserCreate,
     service: AuthService = Depends(_get_auth_service),
 ) -> UserResponse:
@@ -31,7 +34,9 @@ async def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("10/minute")
 async def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     service: AuthService = Depends(_get_auth_service),
 ) -> TokenResponse:
@@ -57,6 +62,7 @@ async def get_profile(
         email=doc["email"],
         first_name=doc.get("first_name"),
         last_name=doc.get("last_name"),
+        avatar_id=doc.get("avatar_id"),
     )
 
 
@@ -75,4 +81,5 @@ async def update_profile(
         email=doc["email"],
         first_name=doc.get("first_name"),
         last_name=doc.get("last_name"),
+        avatar_id=doc.get("avatar_id"),
     )

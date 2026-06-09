@@ -25,6 +25,7 @@ class UserProfile(BaseModel):
     email: str
     first_name: str | None = None
     last_name: str | None = None
+    avatar_id: str | None = None
 
 
 class UserProfileUpdate(BaseModel):
@@ -32,6 +33,7 @@ class UserProfileUpdate(BaseModel):
 
     first_name: str | None = None
     last_name: str | None = None
+    avatar_id: str | None = None
 
 
 class TokenResponse(BaseModel):
