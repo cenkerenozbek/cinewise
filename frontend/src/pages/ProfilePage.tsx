@@ -5,6 +5,7 @@ import { useHistoryStats, useHistoryList } from '../hooks/useHistory';
 import { TasteProfileChart } from '../components/TasteProfileChart';
 import { useMoodTheme } from '../features/mood/MoodThemeContext';
 import { useProfile, useUpdateProfile } from '../hooks/useProfile';
+import { AVATARS } from '../lib/avatars';
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w92';
 const CF_THRESHOLD = 5;
@@ -20,19 +21,27 @@ export function ProfilePage() {
   const [editMode, setEditMode] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [editAvatar, setEditAvatar] = useState<string | null>(null);
 
   function openEdit() {
     setFirstName(profile?.first_name ?? '');
     setLastName(profile?.last_name ?? '');
+    setEditAvatar(profile?.avatar_id ?? null);
     setEditMode(true);
   }
 
   function handleSave() {
     updateProfile(
-      { first_name: firstName.trim() || undefined, last_name: lastName.trim() || undefined },
+      {
+        first_name: firstName.trim() || undefined,
+        last_name: lastName.trim() || undefined,
+        avatar_id: editAvatar ?? undefined,
+      },
       { onSuccess: () => setEditMode(false) },
     );
   }
+
+  const currentAvatarFile = AVATARS.find(a => a.id === profile?.avatar_id)?.file ?? null;
 
   const recentActivity = historyData?.items.slice(0, 5) ?? [];
   const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || null;
@@ -47,12 +56,21 @@ export function ProfilePage() {
         className="rounded-2xl border p-6 mb-6 flex items-center gap-4"
         style={{ background: 'var(--cw-surface)', borderColor: 'var(--cw-border)' }}
       >
-        <div
-          className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-black text-white flex-shrink-0"
-          style={{ background: 'var(--cw-accent)' }}
-        >
-          {initial}
-        </div>
+        {currentAvatarFile ? (
+          <img
+            src={currentAvatarFile}
+            alt="avatar"
+            className="w-14 h-14 rounded-full object-cover flex-shrink-0 ring-2"
+            style={{ ringColor: 'var(--cw-accent)', outline: '2px solid var(--cw-accent)' }}
+          />
+        ) : (
+          <div
+            className="w-14 h-14 rounded-full flex items-center justify-center text-xl font-black text-white flex-shrink-0"
+            style={{ background: 'var(--cw-accent)' }}
+          >
+            {initial}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           {displayName && <p className="text-slate-100 font-bold truncate">{displayName}</p>}
           <p className="text-slate-400 text-sm truncate">{user?.email}</p>
@@ -84,7 +102,7 @@ export function ProfilePage() {
           style={{ background: 'var(--cw-surface)', borderColor: 'var(--cw-border)' }}
         >
           <h2 className="text-sm font-medium text-slate-300 mb-4">Edit Profile</h2>
-          <div className="grid sm:grid-cols-2 gap-4">
+          <div className="grid sm:grid-cols-2 gap-4 mb-5">
             <div>
               <label className="text-xs text-slate-500 mb-1 block">First Name</label>
               <input
@@ -107,6 +125,38 @@ export function ProfilePage() {
                 style={{ background: 'var(--cw-surface-elevated)', border: '1px solid var(--cw-border)' }}
               />
             </div>
+          </div>
+
+          {/* Avatar picker */}
+          <div>
+            <label className="text-xs text-slate-500 mb-2 block">Choose Avatar</label>
+            <div className="grid grid-cols-6 gap-2">
+              {AVATARS.map((avatar) => {
+                const isSelected = editAvatar === avatar.id;
+                return (
+                  <button
+                    key={avatar.id}
+                    type="button"
+                    title={avatar.name}
+                    onClick={() => setEditAvatar(avatar.id)}
+                    className="aspect-square rounded-lg overflow-hidden transition-all duration-150"
+                    style={{
+                      outline: isSelected ? '2px solid var(--cw-accent)' : '1px solid var(--cw-border)',
+                      outlineOffset: isSelected ? '2px' : '0',
+                      opacity: isSelected ? 1 : 0.6,
+                      transform: isSelected ? 'scale(1.05)' : 'scale(1)',
+                    }}
+                  >
+                    <img src={avatar.file} alt={avatar.name} className="w-full h-full object-cover" />
+                  </button>
+                );
+              })}
+            </div>
+            {editAvatar && (
+              <p className="mt-2 text-xs text-slate-400 italic">
+                {AVATARS.find(a => a.id === editAvatar)?.name} — "{AVATARS.find(a => a.id === editAvatar)?.description}"
+              </p>
+            )}
           </div>
           <div className="flex gap-2 mt-4">
             <button
