@@ -61,7 +61,7 @@ export function ProfilePage() {
             src={currentAvatarFile}
             alt="avatar"
             className="w-14 h-14 rounded-full object-cover flex-shrink-0 ring-2"
-            style={{ ringColor: 'var(--cw-accent)', outline: '2px solid var(--cw-accent)' }}
+            style={{ outline: '2px solid var(--cw-accent)', outlineOffset: '2px' }}
           />
         ) : (
           <div

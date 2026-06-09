@@ -198,7 +198,7 @@ async def main() -> None:
         try:
             await client.post(
                 f"{args.base_url}/api/recommendations",
-                json={"genres": ["Action"], "mood": "excited"},
+                json={"genres": ["Action"], "mood": "Happy"},
             )
             await client.get(f"{args.base_url}/api/movies", params={"q": "test", "page": 1})
         except Exception as e:

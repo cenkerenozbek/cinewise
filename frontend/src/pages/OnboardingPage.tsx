@@ -117,11 +117,10 @@ export function OnboardingPage() {
                           ? 'ring-2 ring-offset-2 scale-105'
                           : 'ring-1 hover:scale-102 opacity-70 hover:opacity-100'
                       }`}
-                      style={{
-                        ringColor: isSelected ? 'var(--cw-accent)' : 'var(--cw-border)',
-                        ringOffsetColor: 'var(--cw-surface)',
-                        ...(isSelected ? { outline: '2px solid var(--cw-accent)', outlineOffset: '2px' } : { outline: '1px solid var(--cw-border)' }),
-                      }}
+                      style={isSelected
+                        ? { outline: '2px solid var(--cw-accent)', outlineOffset: '2px' }
+                        : { outline: '1px solid var(--cw-border)' }
+                      }
                     >
                       <img
                         src={avatar.file}

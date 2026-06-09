@@ -71,7 +71,7 @@ export function MoodThemeProvider({ children }: { children: React.ReactNode }) {
   function toggleTheme() {
     setIsDark((prev) => {
       const next = !prev;
-      try { localStorage.setItem('cw-theme', next ? 'dark' : 'light'); } catch {}
+      try { localStorage.setItem('cw-theme', next ? 'dark' : 'light'); } catch { /* localStorage unavailable in some environments */ }
       return next;
     });
   }
@@ -83,8 +83,7 @@ export function MoodThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useMoodTheme() {
   return useContext(MoodThemeContext);
 }
-
-export { MOOD_THEMES_DARK as MOOD_THEMES };

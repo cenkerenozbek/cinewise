@@ -40,12 +40,19 @@ export function TasteProfileChart({ genreCounts, size = 180 }: TasteProfileChart
   const innerR = size * 0.22;
   const gap = 0.03; // radians gap between arcs
 
-  let currentAngle = -Math.PI / 2;
+  // Pre-compute cumulative start angles to avoid mutating a variable inside map.
+  const startAngles = entries.reduce<number[]>((acc, [, count]) => {
+    const prev = acc.length > 0 ? acc[acc.length - 1] : -Math.PI / 2;
+    const frac = count / total;
+    acc.push(prev + frac * 2 * Math.PI);
+    return acc;
+  }, []);
+
   const arcs = entries.map(([genre, count], i) => {
     const fraction = count / total;
-    const startAngle = currentAngle + gap / 2;
-    const endAngle = currentAngle + fraction * 2 * Math.PI - gap / 2;
-    currentAngle += fraction * 2 * Math.PI;
+    const base = i === 0 ? -Math.PI / 2 : startAngles[i - 1];
+    const startAngle = base + gap / 2;
+    const endAngle = base + fraction * 2 * Math.PI - gap / 2;
 
     const x1 = cx + r * Math.cos(startAngle);
     const y1 = cy + r * Math.sin(startAngle);

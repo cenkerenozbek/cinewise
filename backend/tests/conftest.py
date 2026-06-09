@@ -171,6 +171,8 @@ async def client_with_hybrid(test_db):
     app.state.movie_embeddings = None
     app.state.top_indices = top_indices
     app.state.top_scores = None
+    app.state.faiss_index = None
+    app.state.catalog_cache = {m["tmdb_id"]: m for m in _SEED_MOVIE_DATA}
     app.state.cf_top_indices = cf_top_indices
     app.state.cf_tmdb_ids = tmdb_ids
     app.state.cf_top_scores = None
@@ -264,6 +266,10 @@ async def client_with_nlp(test_db):
     app.state.movie_embeddings = None
     app.state.top_indices = top_indices
     app.state.top_scores = None
+    app.state.faiss_index = None
+    # Populate catalog_cache from seed data so the recommendation service
+    # uses genre-aware scoring instead of falling back to top-rated.
+    app.state.catalog_cache = {m["tmdb_id"]: m for m in _SEED_MOVIE_DATA}
     # CF artifacts — disabled by default
     app.state.cf_top_indices = None
     app.state.cf_tmdb_ids = []

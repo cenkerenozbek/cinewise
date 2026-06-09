@@ -59,6 +59,7 @@ function HeroSection({ movies, personalized = false }: { movies: MovieSummary[];
     if (heroMovies.length === 0) return;
     resetTimer();
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [heroMovies.length]);
 
   function goTo(index: number) {

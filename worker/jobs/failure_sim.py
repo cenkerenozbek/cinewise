@@ -181,8 +181,8 @@ async def run_scenarios(base_url: str, skip_destructive: bool) -> list[dict]:
             logger.info("  SKIPPED (--skip-destructive)")
             results.append(_result(
                 "CF artifact missing — content-only fallback",
-                True, "SKIPPED", "SKIPPED",
-                "Pass skipped by flag",
+                False, "SKIPPED", "SKIPPED",
+                "Skipped — run without --skip-destructive inside Docker to execute",
             ))
         elif not _artifact_exists("cf_index.joblib"):
             logger.info("  cf_index.joblib not found — test not applicable")
@@ -223,8 +223,8 @@ async def run_scenarios(base_url: str, skip_destructive: bool) -> list[dict]:
             logger.info("  SKIPPED (--skip-destructive)")
             results.append(_result(
                 "NLP artifact missing → 503",
-                True, "SKIPPED", "SKIPPED",
-                "Pass skipped by flag",
+                False, "SKIPPED", "SKIPPED",
+                "Skipped — run without --skip-destructive inside Docker to execute",
             ))
         elif not _artifact_exists("similarity_index.joblib"):
             results.append(_result(
@@ -283,12 +283,13 @@ async def main() -> None:
 
     results = await run_scenarios(args.base_url, args.skip_destructive)
 
-    passed = sum(1 for r in results if r["passed"])
+    skipped = sum(1 for r in results if r["actual"] == "SKIPPED")
+    passed = sum(1 for r in results if r["passed"] and r["actual"] != "SKIPPED")
     total = len(results)
-    overall = passed == total
+    overall = passed == (total - skipped)
 
     logger.info(f"\n{'='*60}")
-    logger.info(f"FAILURE SIMULATION: {passed}/{total} scenarios passed")
+    logger.info(f"FAILURE SIMULATION: {passed}/{total - skipped} scenarios passed, {skipped} skipped")
     logger.info(f"Overall: {'ALL PASS' if overall else 'SOME FAIL'}")
     logger.info(f"{'='*60}")
 
@@ -296,6 +297,7 @@ async def main() -> None:
         "run_at": datetime.utcnow().isoformat() + "Z",
         "base_url": args.base_url,
         "passed": passed,
+        "skipped": skipped,
         "total": total,
         "overall_pass": overall,
         "results": results,
