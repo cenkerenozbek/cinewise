@@ -36,12 +36,14 @@ services:
     environment:
       - TMDB_TARGET_COUNT=20000
       - SEED_USER_LIMIT=2000
+      - MOVIELENS_DIR=/data/movielens/ml-20m
     depends_on:
       - mongo
     volumes:
       - ./worker:/app
       - ./shared:/app/shared
       - nlp_artifacts:/artifacts
+      - ./data/movielens:/data/movielens:ro
     restart: unless-stopped
 
 volumes:
