@@ -179,7 +179,16 @@ async def reload_artifacts(request: Request):
 
     Called by the worker after writing new artifacts so new movies and updated
     similarity indexes are picked up immediately.
+
+    Protected by ADMIN_SECRET header when the env var is set; if unset the
+    endpoint is open (acceptable for local Docker-only deployments where the
+    port is not exposed to the internet).
     """
+    if settings.ADMIN_SECRET:
+        token = request.headers.get("X-Admin-Secret", "")
+        if token != settings.ADMIN_SECRET:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=401, detail="Invalid admin secret")
     await _reload_artifacts(request.app)
     return {
         "status": "reloaded",

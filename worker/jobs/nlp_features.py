@@ -193,9 +193,11 @@ async def main() -> None:
     client.close()
 
     backend_url = os.environ.get("BACKEND_URL", "http://backend:8000")
+    admin_secret = os.environ.get("ADMIN_SECRET", "")
     try:
+        headers = {"X-Admin-Secret": admin_secret} if admin_secret else {}
         with httpx.Client(timeout=30) as http:
-            resp = http.post(f"{backend_url}/api/admin/reload")
+            resp = http.post(f"{backend_url}/api/admin/reload", headers=headers)
             logger.info("Backend reload triggered: %s", resp.json())
     except Exception as _reload_err:
         logger.warning("Could not trigger backend reload (%s) — restart backend manually", _reload_err)

@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_HOURS: int = 24
     CF_THRESHOLD: int = 3
     CF_ALPHA: float = 0.35
+    ADMIN_SECRET: str = ""
 
     model_config = {
         "env_file": "../.env",
