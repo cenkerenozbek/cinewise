@@ -3,37 +3,86 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { useAuthContext } from '../features/auth/auth-context';
 import { useMoodTheme } from '../features/mood/MoodThemeContext';
 import { useProfile } from '../hooks/useProfile';
+import { useUserPreferences, useSaveUserPreferences } from '../hooks/useRecommendations';
+import { AVATARS } from '../lib/avatars';
+
+const MOOD_OPTIONS = [
+  { key: 'Happy',        icon: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z', color: '#f59e0b' },
+  { key: 'Tense',        icon: 'M13 10V3L4 14h7v7l9-11h-7z',                                                                                                                         color: '#2dd4bf' },
+  { key: 'Relaxing',     icon: 'M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z',                                                               color: '#b8a4ed' },
+  { key: 'Mind-bending', icon: 'M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z', color: '#a855f7' },
+  { key: 'Romantic',     icon: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z',                       color: '#fb7185' },
+];
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuthContext();
-  const { isDark, toggleTheme } = useMoodTheme();
+  const { isDark, toggleTheme, activeMood, setActiveMood } = useMoodTheme();
   const { data: profile } = useProfile({ enabled: isAuthenticated });
+  const { data: savedPrefs } = useUserPreferences(isAuthenticated, user?.id ?? 'anonymous');
+  const saveMutation = useSaveUserPreferences(user?.id ?? 'anonymous');
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const searchQuery = searchParams.get('q') ?? '';
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [moodOpen, setMoodOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const moodRef = useRef<HTMLDivElement>(null);
+  const searchOriginRef = useRef<string | null>(null);
 
   const isHomePage = location.pathname === '/';
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function onClickOutside(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setDropdownOpen(false);
+      }
+      if (moodRef.current && !moodRef.current.contains(e.target as Node)) {
+        setMoodOpen(false);
       }
     }
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
+  // Reset origin ref when user navigates away from home via other means
+  useEffect(() => {
+    if (location.pathname !== '/') {
+      searchOriginRef.current = null;
+    }
+  }, [location.pathname]);
+
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
     const value = e.target.value;
     if (location.pathname !== '/') {
+      searchOriginRef.current = location.pathname;
       navigate(`/?q=${encodeURIComponent(value)}`);
+    } else if (!value && searchOriginRef.current) {
+      const origin = searchOriginRef.current;
+      searchOriginRef.current = null;
+      navigate(origin);
     } else {
       setSearchParams(value ? { q: value } : {}, { replace: true });
+    }
+  }
+
+  function handleClearSearch() {
+    if (searchOriginRef.current) {
+      const origin = searchOriginRef.current;
+      searchOriginRef.current = null;
+      navigate(origin);
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  }
+
+  function handleMoodSelect(key: string | null) {
+    const next = key === activeMood ? null : key;
+    setActiveMood(next);
+    setMoodOpen(false);
+    if (isAuthenticated) {
+      saveMutation.mutate({ genres: savedPrefs?.genres ?? [], mood: next ?? undefined });
     }
   }
 
@@ -49,7 +98,6 @@ export function Navbar() {
       ? 'bg-gray-950/95 backdrop-blur-md border-b border-white/5'
       : 'bg-white shadow-sm border-b border-gray-100';
 
-  const logoColor = isHomePage || isDark ? '#ffffff' : '#111827';
   const textColor = isHomePage || isDark ? '#ffffff' : '#111827';
   const mutedColor = isHomePage || isDark ? 'rgba(255,255,255,0.7)' : '#6b7280';
   const searchBg = isHomePage ? 'rgba(0,0,0,0.35)' : isDark ? 'var(--cw-surface)' : '#f3f4f6';
@@ -57,19 +105,20 @@ export function Navbar() {
 
   const displayName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || null;
   const initial = displayName?.[0]?.toUpperCase() ?? user?.email?.[0]?.toUpperCase() ?? '?';
+  const avatarFile = AVATARS.find(a => a.id === profile?.avatar_id)?.file ?? null;
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 px-6 py-0 flex items-center gap-4 h-[64px] transition-all duration-300 ${navBg}`}>
       {/* Logo */}
-      <Link to="/" className="flex items-center gap-3 shrink-0 hover:opacity-80 transition-opacity">
-        <div className="w-[42px] h-[42px] rounded-lg flex items-center justify-center" style={{ background: 'var(--cw-accent)' }}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-          </svg>
-        </div>
-        <span className="text-xl font-bold tracking-wide" style={{ color: logoColor }}>
-          Cinewise
-        </span>
+      <Link to="/" className="shrink-0 hover:opacity-80 transition-opacity">
+        {isDark ? (
+          <img src="/cinewise-logo-dark.webp" alt="Cinewise" className="h-[42px] w-auto object-contain" />
+        ) : (
+          <picture>
+            <source srcSet="/cinewise-logo.webp" type="image/webp" />
+            <img src="/cinewise-logo.png" alt="Cinewise" className="h-[42px] w-auto object-contain" />
+          </picture>
+        )}
       </Link>
 
       {/* Search */}
@@ -83,14 +132,14 @@ export function Navbar() {
           type="text"
           value={searchQuery}
           onChange={handleSearchChange}
-          placeholder="What do you want to watch?"
+          placeholder="Search by title, actor or director…"
           className={`w-full pl-9 pr-3 py-2 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--cw-accent)] transition-all ${isHomePage ? 'placeholder-white/50' : isDark ? 'placeholder-slate-500' : 'placeholder-gray-400'}`}
           style={{ background: searchBg, border: `1.5px solid ${searchBorder}`, color: textColor }}
         />
         {searchQuery && (
           <button
             type="button"
-            onClick={() => setSearchParams({}, { replace: true })}
+            onClick={handleClearSearch}
             className="absolute inset-y-0 right-2 flex items-center px-1"
             style={{ color: mutedColor }}
           >
@@ -103,23 +152,84 @@ export function Navbar() {
 
       {/* Right side */}
       <div className="flex items-center gap-3 shrink-0">
-        {/* Theme toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="w-8 h-8 rounded-full flex items-center justify-center transition-all hover:opacity-80"
-        >
-          {isDark ? (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        {/* Mood picker */}
+        <div className="relative" ref={moodRef}>
+          <button
+            type="button"
+            onClick={() => setMoodOpen((v) => !v)}
+            className="flex items-center gap-2 rounded-full pl-2.5 pr-2 py-1 transition-all hover:opacity-90"
+            style={{
+              background: activeMood ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.06)',
+              backdropFilter: 'blur(8px)',
+              border: `1px solid ${activeMood ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)'}`,
+            }}
+          >
+            {activeMood ? (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+                style={{ color: MOOD_OPTIONS.find(m => m.key === activeMood)?.color }}>
+                <path d={MOOD_OPTIONS.find(m => m.key === activeMood)?.icon} />
+              </svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+                style={{ color: mutedColor }}>
+                <path d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            )}
+            <span className="text-xs font-medium" style={{ color: activeMood ? textColor : mutedColor }}>
+              {activeMood ?? 'Mood'}
+            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 transition-transform duration-200 shrink-0" style={{ color: mutedColor, transform: moodOpen ? 'rotate(180deg)' : 'rotate(0deg)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
-          ) : (
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ color: mutedColor }}>
-              <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-            </svg>
+          </button>
+
+          {moodOpen && (
+            <div
+              className="absolute right-0 top-[calc(100%+8px)] w-44 rounded-xl overflow-hidden shadow-xl z-50"
+              style={{
+                background: isDark ? '#1e2130' : '#ffffff',
+                border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'}`,
+              }}
+            >
+              <div className="px-3 py-2 border-b text-xs font-semibold" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#f3f4f6', color: isDark ? '#94a3b8' : '#6b7280' }}>
+                Mood
+              </div>
+              {MOOD_OPTIONS.map(({ key, icon, color }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleMoodSelect(key)}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 text-sm transition-colors hover:opacity-80"
+                  style={{
+                    color: isDark ? '#e2e8f0' : '#111827',
+                    background: activeMood === key ? (isDark ? 'rgba(255,255,255,0.06)' : '#f3f4f6') : 'transparent',
+                    fontWeight: activeMood === key ? 600 : 400,
+                  }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ color }}>
+                    <path d={icon} />
+                  </svg>
+                  {key}
+                </button>
+              ))}
+              {activeMood && (
+                <div className="border-t" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#f3f4f6' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleMoodSelect(null)}
+                    className="flex items-center gap-2.5 w-full px-3 py-2 text-sm hover:opacity-80 transition-colors"
+                    style={{ color: isDark ? '#94a3b8' : '#6b7280' }}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear mood
+                  </button>
+                </div>
+              )}
+            </div>
           )}
-        </button>
+        </div>
 
         {isAuthenticated && user ? (
           <>
@@ -130,17 +240,26 @@ export function Navbar() {
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 transition-all hover:opacity-90"
                 style={{
-                  background: isHomePage || isDark ? 'rgba(255,255,255,0.1)' : 'var(--cw-surface-elevated)',
-                  border: `1px solid ${isHomePage || isDark ? 'rgba(255,255,255,0.15)' : 'var(--cw-border)'}`,
+                  background: isHomePage || isDark ? 'rgba(255,255,255,0.12)' : 'var(--cw-surface-elevated)',
+                  backdropFilter: 'blur(8px)',
+                  border: `1px solid ${isHomePage || isDark ? 'rgba(255,255,255,0.2)' : 'var(--cw-border)'}`,
                 }}
               >
                 {/* Avatar */}
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                  style={{ background: 'var(--cw-accent)' }}
-                >
-                  {initial}
-                </div>
+                {avatarFile ? (
+                  <img
+                    src={avatarFile}
+                    alt="avatar"
+                    className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+                  />
+                ) : (
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                    style={{ background: 'var(--cw-accent)' }}
+                  >
+                    {initial}
+                  </div>
+                )}
                 <span className="text-sm font-medium max-w-[160px] truncate" style={{ color: textColor }}>
                   {displayName ?? user.email.split('@')[0]}
                 </span>
@@ -185,6 +304,39 @@ export function Navbar() {
                       {label}
                     </Link>
                   ))}
+
+                  <div className="border-t" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#f3f4f6' }}>
+                    {/* Theme toggle row */}
+                    <button
+                      type="button"
+                      onClick={toggleTheme}
+                      className="flex items-center justify-between w-full px-4 py-2.5 text-sm transition-colors hover:opacity-80"
+                      style={{ color: isDark ? '#e2e8f0' : '#111827' }}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isDark ? (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0 text-amber-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                          </svg>
+                        ) : (
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" style={{ color: '#6b7280' }}>
+                            <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                          </svg>
+                        )}
+                        Dark mode
+                      </div>
+                      {/* Pill toggle */}
+                      <div
+                        className="w-8 h-4 rounded-full relative transition-colors duration-200 flex-shrink-0"
+                        style={{ background: isDark ? 'var(--cw-accent)' : '#d1d5db' }}
+                      >
+                        <div
+                          className="absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform duration-200"
+                          style={{ transform: isDark ? 'translateX(18px)' : 'translateX(2px)' }}
+                        />
+                      </div>
+                    </button>
+                  </div>
 
                   <div className="border-t" style={{ borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#f3f4f6' }}>
                     <button

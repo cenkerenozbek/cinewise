@@ -44,7 +44,17 @@ const MoodThemeContext = createContext<MoodThemeContextValue>({
 });
 
 export function MoodThemeProvider({ children }: { children: React.ReactNode }) {
-  const [activeMood, setActiveMood] = useState<string | null>(null);
+  const [activeMood, setActiveMoodState] = useState<string | null>(() => {
+    try { return localStorage.getItem('cw-mood') || null; } catch { return null; }
+  });
+
+  function setActiveMood(mood: string | null) {
+    setActiveMoodState(mood);
+    try {
+      if (mood) localStorage.setItem('cw-mood', mood);
+      else localStorage.removeItem('cw-mood');
+    } catch { /* ignore */ }
+  }
   const [isDark, setIsDark] = useState<boolean>(() => {
     try {
       return localStorage.getItem('cw-theme') === 'dark';
