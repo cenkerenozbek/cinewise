@@ -1,17 +1,18 @@
-import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useMovieDetail, useMovieTrailer } from '../hooks/useMovies';
 import { FeedbackControls } from '../components/FeedbackControls';
 import { WatchlistButton } from '../components/WatchlistButton';
 import { useAuth } from '../hooks/useAuth';
-import { useFeedback, useDeleteFeedback } from '../hooks/useFeedback';
+import { useFeedback, useDeleteFeedback, useMovieFeedback } from '../hooks/useFeedback';
 import type { FeedbackAction, WatchCompletion } from '../lib/types';
-import { WATCH_COMPLETION_VALUES } from '../lib/types';
+import { WATCH_COMPLETION_VALUES, WATCH_COMPLETION_REVERSE } from '../lib/types';
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/w1280';
 
 export function MovieDetailPage() {
+  const navigate = useNavigate();
   const { tmdbId } = useParams<{ tmdbId: string }>();
   const { data: movie, isLoading, isError } = useMovieDetail(Number(tmdbId));
   const { data: trailerData } = useMovieTrailer(Number(tmdbId));
@@ -19,8 +20,17 @@ export function MovieDetailPage() {
   const { isAuthenticated } = useAuth();
   const { mutate: submitFeedback, isPending: feedbackPending } = useFeedback();
   const { mutate: deleteFeedback } = useDeleteFeedback();
+  const { data: existingFeedback } = useMovieFeedback(Number(tmdbId), isAuthenticated);
   const [vote, setVote] = useState<FeedbackAction | undefined>();
   const [watchCompletion, setWatchCompletion] = useState<WatchCompletion | null>(null);
+
+  useEffect(() => {
+    if (!existingFeedback) return;
+    if (existingFeedback.action) setVote(existingFeedback.action as FeedbackAction);
+    if (existingFeedback.watch_completion != null) {
+      setWatchCompletion(WATCH_COMPLETION_REVERSE[existingFeedback.watch_completion] ?? null);
+    }
+  }, [existingFeedback]);
 
   function handleVote(action: FeedbackAction) {
     if (!movie) return;
@@ -40,14 +50,16 @@ export function MovieDetailPage() {
     deleteFeedback(movie.tmdb_id, { onError: () => setVote(prev) });
   }
 
-  function handleWatchCompletion(v: WatchCompletion) {
+  function handleWatchCompletion(v: WatchCompletion | null) {
     if (!movie) return;
     setWatchCompletion(v);
-    submitFeedback({
-      movie_id: movie.tmdb_id,
-      action: vote ?? 'like',
-      watch_completion: WATCH_COMPLETION_VALUES[v],
-    });
+    if (v !== null) {
+      submitFeedback({
+        movie_id: movie.tmdb_id,
+        action: vote ?? 'like',
+        watch_completion: WATCH_COMPLETION_VALUES[v],
+      });
+    }
   }
 
   if (isLoading) {
@@ -102,15 +114,16 @@ export function MovieDetailPage() {
 
         {/* back button */}
         <div className="absolute top-[24px] left-6">
-          <Link
-            to="/"
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-white/80 hover:text-white transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
             Back
-          </Link>
+          </button>
         </div>
       </div>
 
@@ -119,7 +132,7 @@ export function MovieDetailPage() {
         <div className="flex flex-col md:flex-row gap-8 items-start">
 
           {/* Poster */}
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 pt-20">
             {posterUrl ? (
               <img
                 src={posterUrl}
@@ -209,43 +222,36 @@ export function MovieDetailPage() {
                 Watch Trailer
               </a>
             )}
+
+            {/* ── Feedback ── */}
+            {isAuthenticated ? (
+              <>
+                <FeedbackControls
+                  title={movie.title}
+                  vote={vote}
+                  onVote={handleVote}
+                  onClearVote={handleClearVote}
+                  watchCompletion={watchCompletion}
+                  onWatchCompletion={handleWatchCompletion}
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  {feedbackPending ? 'Saving...' : 'Your feedback trains your For You recommendations.'}
+                </p>
+              </>
+            ) : (
+              <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--cw-border)' }}>
+                <p className="text-xs font-semibold text-slate-400 mb-3">How was it?</p>
+                <p className="text-sm text-slate-500 mb-3">Sign in to rate movies and get better recommendations.</p>
+                <Link
+                  to="/login"
+                  className="inline-flex h-9 items-center justify-center rounded-lg px-4 text-sm font-medium text-white transition-opacity hover:opacity-90"
+                  style={{ background: 'var(--cw-accent)' }}
+                >
+                  Sign In
+                </Link>
+              </div>
+            )}
           </div>
-        </div>
-
-
-        {/* ── Feedback ── */}
-        <div className="mt-8 max-w-sm">
-          {isAuthenticated ? (
-            <>
-              <FeedbackControls
-                title={movie.title}
-                vote={vote}
-                onVote={handleVote}
-                onClearVote={handleClearVote}
-                watchCompletion={watchCompletion}
-                onWatchCompletion={handleWatchCompletion}
-              />
-              <p className="mt-2 text-xs text-slate-500">
-                {feedbackPending ? 'Saving...' : 'Your feedback trains your For You recommendations.'}
-              </p>
-            </>
-          ) : (
-            <div
-              className="rounded-xl border p-4"
-              style={{ borderColor: 'var(--cw-accent)33', background: 'var(--cw-accent)11' }}
-            >
-              <p className="text-sm font-medium text-slate-300">
-                Sign in to rate movies and improve your recommendations.
-              </p>
-              <Link
-                to="/login"
-                className="mt-3 inline-flex h-10 items-center justify-center rounded-xl px-4 text-sm font-medium text-white transition-opacity hover:opacity-90"
-                style={{ background: 'var(--cw-accent)' }}
-              >
-                Sign In
-              </Link>
-            </div>
-          )}
         </div>
 
         {(movie.vote_count !== null || movie.popularity !== null) && (
