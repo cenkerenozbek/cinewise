@@ -9,7 +9,7 @@ interface FeedbackControlsProps {
   onVote: (action: FeedbackAction) => void;
   onClearVote?: () => void;
   watchCompletion?: WatchCompletion | null;
-  onWatchCompletion?: (v: WatchCompletion) => void;
+  onWatchCompletion?: (v: WatchCompletion | null) => void;
 }
 
 export function FeedbackControls({
@@ -29,18 +29,13 @@ export function FeedbackControls({
   }
 
   return (
-    <div
-      className="rounded-xl border p-3"
-      style={{ background: 'var(--cw-surface-elevated)', borderColor: 'var(--cw-border)' }}
-    >
-      <p className="mb-2 text-[10px] font-normal uppercase tracking-widest text-slate-400">
-        Rate this film
-      </p>
-      <div className="grid grid-cols-2 gap-2">
+    <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--cw-border)' }}>
+      <p className="mb-3 text-xs font-semibold text-slate-400">How was it?</p>
+      <div className="flex gap-2">
         <button
           type="button"
           onClick={() => handleClick('like')}
-          className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-normal transition-all duration-200 ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
             vote === 'like'
               ? 'border-green-500 bg-green-500/20 text-green-300'
               : 'border-white/10 bg-transparent text-slate-400 hover:border-green-500/50 hover:text-green-400'
@@ -55,7 +50,7 @@ export function FeedbackControls({
         <button
           type="button"
           onClick={() => handleClick('dislike')}
-          className={`flex h-9 items-center justify-center gap-1.5 rounded-lg border text-xs font-normal transition-all duration-200 ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-all duration-200 ${
             vote === 'dislike'
               ? 'border-red-500 bg-red-500/20 text-red-300'
               : 'border-white/10 bg-transparent text-slate-400 hover:border-red-500/50 hover:text-red-400'
@@ -71,15 +66,13 @@ export function FeedbackControls({
 
       {/* Watch completion picker - appears after voting */}
       {vote && onWatchCompletion && (
-        <div className="mt-3 overflow-hidden" style={{ animation: 'fadeInUp 0.3s ease both' }}>
+        <div className="mt-4 overflow-hidden" style={{ animation: 'fadeInUp 0.3s ease both' }}>
           <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1.5">
             How much did you watch?
           </p>
           <WatchCompletionPicker
             value={watchCompletion ?? null}
-            onChange={(v) => {
-              onWatchCompletion(v);
-            }}
+            onChange={(v) => { onWatchCompletion(v); }}
             accentColor="var(--cw-accent)"
           />
           {watchCompletion && (

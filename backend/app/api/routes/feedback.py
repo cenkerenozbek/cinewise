@@ -33,6 +33,23 @@ class FeedbackRequest(BaseModel):
         return v
 
 
+@router.get("/{movie_id}")
+async def get_feedback(
+    movie_id: int,
+    user_id: str = Depends(get_current_user),
+    db=Depends(get_db),
+) -> dict:
+    """Return the user's existing feedback for a movie, or empty object if none."""
+    repo = InteractionsRepository(db)
+    doc = await repo.get_by_user_and_movie(user_id, movie_id)
+    if not doc:
+        return {}
+    return {
+        "action": doc.get("action"),
+        "watch_completion": doc.get("watch_completion"),
+    }
+
+
 @router.post("", status_code=204)
 async def submit_feedback(
     body: FeedbackRequest,

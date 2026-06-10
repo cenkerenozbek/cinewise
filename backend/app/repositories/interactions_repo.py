@@ -49,6 +49,10 @@ class InteractionsRepository:
         """Remove the user's feedback for a specific movie."""
         await self.collection.delete_one({"user_id": user_id, "movie_id": movie_id})
 
+    async def get_by_user_and_movie(self, user_id: str, movie_id: int) -> dict | None:
+        """Return the interaction document for a specific user+movie pair, or None."""
+        return await self.collection.find_one({"user_id": user_id, "movie_id": movie_id})
+
     async def get_by_user_id(self, user_id: str) -> list[dict]:
         """Return all interaction documents for the given user."""
         cursor = self.collection.find({"user_id": user_id})

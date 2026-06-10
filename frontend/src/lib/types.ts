@@ -71,6 +71,13 @@ export const WATCH_COMPLETION_VALUES: Record<WatchCompletion, number> = {
   finished: 1.0,
 };
 
+export const WATCH_COMPLETION_REVERSE: Record<number, WatchCompletion> = {
+  0.05: 'barely',
+  0.5: 'half',
+  0.75: 'mostly',
+  1.0: 'finished',
+};
+
 export interface UserInteraction {
   movie_id: number;
   action: FeedbackAction;

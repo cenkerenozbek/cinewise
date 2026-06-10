@@ -60,7 +60,7 @@ export function ProfilePage() {
           <img
             src={currentAvatarFile}
             alt="avatar"
-            className="w-14 h-14 rounded-full object-cover flex-shrink-0 ring-2"
+            className="w-14 h-14 rounded-full object-cover flex-shrink-0"
             style={{ outline: '2px solid var(--cw-accent)', outlineOffset: '2px' }}
           />
         ) : (
@@ -190,18 +190,20 @@ export function ProfilePage() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Rated', value: stats?.total ?? 0, color: 'var(--cw-accent)' },
-            { label: 'Liked', value: stats?.liked ?? 0, color: '#4ade80' },
-            { label: 'Skipped', value: stats?.disliked ?? 0, color: '#f87171' },
+            { label: 'Total Rated', value: stats?.total ?? 0, color: 'var(--cw-accent)', filter: 'all' },
+            { label: 'Liked', value: stats?.liked ?? 0, color: '#4ade80', filter: 'liked' },
+            { label: 'Skipped', value: stats?.disliked ?? 0, color: '#f87171', filter: 'disliked' },
             {
               label: 'Avg. Watch',
               value: stats?.avg_completion != null ? `${Math.round(stats.avg_completion * 100)}%` : '—',
               color: '#fbbf24',
+              filter: 'watched',
             },
           ].map((stat) => (
-            <div
+            <Link
               key={stat.label}
-              className="rounded-xl border p-4 flex flex-col gap-1"
+              to={`/history?filter=${stat.filter}`}
+              className="rounded-xl border p-4 flex flex-col gap-1 transition-opacity hover:opacity-80"
               style={{
                 background: 'var(--cw-surface)',
                 borderColor: 'var(--cw-border)',
@@ -211,7 +213,7 @@ export function ProfilePage() {
             >
               <p className="text-2xl font-black" style={{ color: stat.color }}>{stat.value}</p>
               <p className="text-xs text-slate-400">{stat.label}</p>
-            </div>
+            </Link>
           ))}
         </div>
       )}
@@ -228,7 +230,7 @@ export function ProfilePage() {
               <div className="w-32 h-32 rounded-full animate-pulse" style={{ background: 'var(--cw-surface-elevated)' }} />
             </div>
           ) : stats && Object.keys(stats.genre_counts).length > 0 ? (
-            <TasteProfileChart genreCounts={stats.genre_counts} size={160} />
+            <TasteProfileChart genreCounts={stats.genre_counts} likedCount={stats.liked} size={160} />
           ) : (
             <div className="text-center py-8 text-slate-500 text-sm">
               Rate at least 3 movies to see your taste profile

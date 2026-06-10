@@ -38,13 +38,15 @@ export function RecommendationCard({
   const { mutate: submitFeedback } = useFeedback();
   const { mutate: deleteFeedback } = useDeleteFeedback();
 
-  function handleWatchCompletion(v: WatchCompletion) {
+  function handleWatchCompletion(v: WatchCompletion | null) {
     setWatchCompletion(v);
-    submitFeedback({
-      movie_id: item.tmdb_id,
-      action: vote ?? 'like',
-      watch_completion: WATCH_COMPLETION_VALUES[v],
-    });
+    if (v !== null) {
+      submitFeedback({
+        movie_id: item.tmdb_id,
+        action: vote ?? 'like',
+        watch_completion: WATCH_COMPLETION_VALUES[v],
+      });
+    }
   }
 
   function handleClearVote() {

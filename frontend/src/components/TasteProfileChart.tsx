@@ -1,3 +1,5 @@
+import { useMoodTheme } from '../features/mood/MoodThemeContext';
+
 const CHART_COLORS = [
   '#f59e0b', // amber - Happy
   '#2dd4bf', // teal - Tense
@@ -15,10 +17,13 @@ const CHART_COLORS = [
 
 interface TasteProfileChartProps {
   genreCounts: Record<string, number>;
+  likedCount?: number;
   size?: number;
 }
 
-export function TasteProfileChart({ genreCounts, size = 180 }: TasteProfileChartProps) {
+export function TasteProfileChart({ genreCounts, likedCount, size = 180 }: TasteProfileChartProps) {
+  const { isDark } = useMoodTheme();
+  const totalTextColor = isDark ? '#f1f5f9' : '#111827';
   const entries = Object.entries(genreCounts)
     .sort(([, a], [, b]) => b - a)
     .slice(0, 8);
@@ -91,9 +96,9 @@ export function TasteProfileChart({ genreCounts, size = 180 }: TasteProfileChart
           dominantBaseline="middle"
           fontSize={size * 0.13}
           fontWeight="700"
-          fill="#f1f5f9"
+          fill={totalTextColor}
         >
-          {total}
+          {likedCount ?? total}
         </text>
         <text
           x={cx}

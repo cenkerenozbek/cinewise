@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useHistoryList } from '../hooks/useHistory';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../lib/api';
@@ -42,8 +42,17 @@ function CompletionRing({ completion, size = 24 }: { completion: number; size?: 
 }
 
 export function HistoryPage() {
-  const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+  const [searchParams] = useSearchParams();
+  const initialFilter = (searchParams.get('filter') as FilterKey | null) ?? 'all';
+  const [activeFilter, setActiveFilter] = useState<FilterKey>(
+    FILTERS.some(f => f.key === initialFilter) ? initialFilter : 'all'
+  );
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    const f = searchParams.get('filter') as FilterKey | null;
+    if (f && FILTERS.some(fi => fi.key === f)) setActiveFilter(f);
+  }, [searchParams]);
   const queryClient = useQueryClient();
 
   const { data, isLoading } = useHistoryList(page, activeFilter);
