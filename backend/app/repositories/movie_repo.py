@@ -39,9 +39,15 @@ class MovieRepository:
         filters: dict = {}
 
         if query:
-            # Use regex search — compatible with both mongomock and MongoDB
             import re
-            filters["title"] = {"$regex": re.escape(query), "$options": "i"}
+            pattern = {"$regex": re.escape(query), "$options": "i"}
+            filters["$or"] = [
+                {"title": pattern},
+                {"title_tr": pattern},
+                {"original_title": pattern},
+                {"cast": pattern},
+                {"director": pattern},
+            ]
 
         if genre:
             filters["genres"] = genre

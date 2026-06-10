@@ -31,10 +31,16 @@ def transform_movie(tmdb_data: dict) -> dict:
     # Genre names
     genres = [g["name"] for g in tmdb_data.get("genres", [])]
 
+    original_title = tmdb_data.get("original_title") or None
+    # For non-English originals, use original_title as title_tr fallback
+    if not title_tr and original_title and tmdb_data.get("original_language") != "en":
+        title_tr = original_title
+
     return {
         "tmdb_id": tmdb_data["id"],
         "title": tmdb_data.get("title", "Unknown"),
         "title_tr": title_tr,
+        "original_title": original_title,
         "year": year,
         "genres": genres,
         "overview": tmdb_data.get("overview") or None,
