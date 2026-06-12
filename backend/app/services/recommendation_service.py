@@ -140,6 +140,47 @@ def build_explanation(genres: list[str], mood: str | None) -> str:
     return f"Recommended because you like {genre_part}."
 
 
+def build_per_movie_explanation(
+    doc: dict,
+    genres: list[str],
+    mood: str | None,
+    best_liked_for: dict[int, dict],
+    liked_titles: dict[int, str],
+) -> str:
+    """Build a film-specific explanation based on the dominant recommendation signal.
+
+    Picks the strongest *true* signal for this film and phrases every tier with a
+    consistent "Because you…" voice so the For You feed reads uniformly:
+        1. Similar to a film the user liked   -> Because you liked "X"
+        2. Matches a genre the user selected   -> Because you picked Science Fiction
+        3. Matches the current mood             -> Because you're feeling Happy (Animation)
+        4. Fallback (history/popularity signal) -> A top pick for your taste
+    """
+    tmdb_id = doc.get("tmdb_id")
+    doc_genres = set(doc.get("genres", []))
+
+    # 1. Strongest, most personal: similar to something they liked.
+    if tmdb_id in best_liked_for:
+        liked_id = best_liked_for[tmdb_id]["liked_id"]
+        liked_title = liked_titles.get(liked_id, "a film you liked")
+        return f'Because you liked "{liked_title}"'
+
+    # 2. Matches a genre the user explicitly picked for this request.
+    selected = sorted(doc_genres & set(genres))
+    if selected:
+        return f"Because you picked {selected[0]}"
+
+    # 3. Matches the current mood (show which genre triggered it).
+    if mood:
+        mood_genres = set(MOOD_GENRE_MAP.get(mood, []))
+        matched = sorted(doc_genres & mood_genres)
+        if matched:
+            return f"Because you're feeling {mood} ({matched[0]})"
+
+    # 4. Ranked via history/popularity without a nameable genre or mood match.
+    return "A top pick for your taste"
+
+
 def _normalised_movie_embeddings(movie_embeddings, expected_rows: int) -> np.ndarray | None:
     """Return a safe, L2-normalised movie embedding matrix when available."""
     if movie_embeddings is None:
@@ -527,6 +568,8 @@ class RecommendationService:
         user_interactions: list = []
         liked_movie_ids: list[int] = []
         disliked_movie_ids: list[int] = []
+        best_liked_for: dict[int, dict] = {}
+        liked_titles: dict[int, str] = {}
 
         if user_id:
             interactions_repo = InteractionsRepository(self._db)
@@ -535,6 +578,11 @@ class RecommendationService:
             disliked_movie_ids = [
                 ia["movie_id"] for ia in user_interactions if ia["action"] == "dislike"
             ]
+            liked_titles = {
+                lid: (catalog_cache[lid].get("title") or catalog_cache[lid].get("title_tr") or "a film you liked")
+                for lid in liked_movie_ids
+                if lid in catalog_cache
+            }
 
             # Build completion weight map from watch_completion values
             completion_map: dict[int, float | None] = {
@@ -678,8 +726,62 @@ class RecommendationService:
         if not top_ids:
             return RecommendationResponse(recommendations=[])
 
+        # Post-hoc: for each top result, find the closest liked movie via direct
+        # cosine similarity. This catches cases where the history loop's neighbor
+        # check missed the film (different-genre request, stale index, etc.).
+        _SIM_THRESHOLD = 0.6
+        _MAX_LIKED_USES = 2
+        # Genres broad enough that sharing only one is not a meaningful link.
+        _BROAD_GENRES = {"Drama", "Comedy", "Thriller", "Action", "Adventure"}
+        if liked_movie_ids and (movie_embeddings is not None or top_indices is not None):
+            rec_genres: dict[int, set[str]] = {
+                tid: set(catalog_cache[tid].get("genres") or [])
+                for tid in top_ids
+                if tid in catalog_cache
+            }
+            liked_genres: dict[int, set[str]] = {
+                lid: set(catalog_cache[lid].get("genres") or [])
+                for lid in liked_movie_ids
+                if lid in catalog_cache
+            }
+            liked_usage: dict[int, int] = {}
+            for tid in top_ids:
+                if tid in best_liked_for:
+                    continue
+                tid_idx = id_to_idx.get(tid)
+                if tid_idx is None:
+                    continue
+                tid_genre_set = rec_genres.get(tid, set())
+                best_sim, best_lid = -1.0, None
+                for liked_id in liked_movie_ids:
+                    if liked_usage.get(liked_id, 0) >= _MAX_LIKED_USES:
+                        continue
+                    liked_idx = id_to_idx.get(liked_id)
+                    if liked_idx is None:
+                        continue
+                    # Genre gate: a single broad genre (e.g. Drama) is too generic
+                    # to justify "because you liked X" — require a specific shared
+                    # genre or at least two overlapping genres.
+                    shared_genres = tid_genre_set & liked_genres.get(liked_id, set())
+                    if not shared_genres:
+                        continue
+                    if len(shared_genres) < 2 and not (shared_genres - _BROAD_GENRES):
+                        continue
+                    if movie_embeddings is not None:
+                        sim = float(np.dot(movie_embeddings[tid_idx], movie_embeddings[liked_idx]))
+                    else:
+                        sim = 0.0
+                        for j, nb_idx in enumerate(top_indices[liked_idx]):
+                            if int(nb_idx) == tid_idx:
+                                sim = float(top_scores[liked_idx][j]) if top_scores is not None else 0.5
+                                break
+                    if sim > best_sim:
+                        best_sim, best_lid = sim, liked_id
+                if best_lid is not None and best_sim >= _SIM_THRESHOLD:
+                    best_liked_for[tid] = {"liked_id": best_lid, "sim": best_sim}
+                    liked_usage[best_lid] = liked_usage.get(best_lid, 0) + 1
+
         doc_map = {tid: catalog_cache[tid] for tid in top_ids if tid in catalog_cache}
-        explanation = build_explanation(genres, mood)
 
         return RecommendationResponse(
             recommendations=[
@@ -692,7 +794,9 @@ class RecommendationService:
                     poster_path=d.get("poster_path"),
                     rating=d.get("rating"),
                     overview=d.get("overview"),
-                    explanation=explanation,
+                    explanation=build_per_movie_explanation(
+                        d, genres, mood, best_liked_for, liked_titles
+                    ),
                 )
                 for tid in top_ids
                 if (d := doc_map.get(tid)) is not None
