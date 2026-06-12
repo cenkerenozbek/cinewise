@@ -95,19 +95,12 @@ function MoodSidebar({ activeMood, onSelect }: MoodSidebarProps) {
             style={{
               background: 'var(--cw-surface)',
               border: `1px solid ${activeOption ? activeOption.color + '50' : 'var(--cw-border)'}`,
-              boxShadow: activeOption ? `0 0 24px ${activeOption.color}18` : 'none',
+              boxShadow: activeOption
+                ? `0 0 24px ${activeOption.color}18, inset 0 0 0 2px ${activeOption.color}40`
+                : 'none',
               transition: 'border-color 0.4s ease, box-shadow 0.4s ease',
             }}
           >
-            {/* gradient accent strip */}
-            <div
-              className="h-0.5 w-full transition-all duration-500"
-              style={{
-                background: activeOption
-                  ? `linear-gradient(90deg, ${activeOption.color}, transparent)`
-                  : 'var(--cw-surface-elevated)',
-              }}
-            />
 
             <div className="p-3">
               {/* Header */}
@@ -179,7 +172,7 @@ function MoodSidebar({ activeMood, onSelect }: MoodSidebarProps) {
                 <button
                   type="button"
                   onClick={() => onSelect(null)}
-                  className="mt-2.5 w-full text-[11px] font-medium text-slate-600 hover:text-slate-300 transition-colors text-center py-1"
+                  className="mt-2.5 w-full text-[11px] font-medium text-slate-500 hover:text-slate-300 transition-colors text-center py-1.5 border border-slate-600/40 hover:border-slate-500/60 rounded-xl"
                 >
                   ✕ Clear
                 </button>
@@ -215,35 +208,68 @@ function PreferenceForm({
 }: PreferenceFormProps) {
   return (
     <div
-      className="rounded-2xl border p-6"
-      style={{ background: 'var(--cw-surface)', borderColor: 'var(--cw-border)' }}
+      className="rounded-2xl p-6 relative"
+      style={{
+        background: 'linear-gradient(145deg, var(--cw-surface), color-mix(in srgb, var(--cw-surface) 85%, #1e1a2e))',
+        border: '1px solid rgba(255,255,255,0.07)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+      }}
     >
-      <div className="space-y-6">
+      <div className="space-y-5">
+        {/* Genres */}
         <div>
-          <p className="text-sm font-bold text-slate-300">Select Genres</p>
+          <div className="flex items-center gap-2 mb-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+            </svg>
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Genres</span>
+            {selectedGenres.length > 0 && (
+              <span
+                className="ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                style={{ background: 'var(--cw-accent)22', color: 'var(--cw-accent)' }}
+              >
+                {selectedGenres.length} selected
+              </span>
+            )}
+          </div>
           <GenreChipGroup
             genres={availableGenres}
             selected={selectedGenres}
             onToggle={onGenreToggle}
           />
           {showValidationError && (
-            <p className="text-sm text-red-400 mt-1">Please select at least one genre.</p>
+            <p className="text-xs text-red-400 mt-2">Please select at least one genre.</p>
           )}
         </div>
+
+        {/* Divider */}
+        <div className="h-px" style={{ background: 'rgba(255,255,255,0.05)' }} />
+
+        {/* Mood */}
         <div>
-          <p className="text-sm font-bold text-slate-300">
-            How are you feeling?{' '}
-            <span className="text-xs text-slate-500 font-normal">(optional)</span>
-          </p>
+          <div className="flex items-center gap-2 mb-1">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">Mood</span>
+            <span className="ml-1 text-[10px] text-slate-600">(optional)</span>
+          </div>
           <MoodChipGroup selected={selectedMood} onSelect={onMoodSelect} />
         </div>
       </div>
+
+      {/* Submit */}
       <button
         type="button"
         onClick={onSubmit}
         disabled={selectedGenres.length === 0}
-        className="mt-6 w-full py-2.5 px-4 font-bold rounded-xl disabled:opacity-50 transition-all text-white"
-        style={{ background: 'var(--cw-accent)' }}
+        className="mt-6 w-full py-3 px-4 font-semibold rounded-xl transition-all duration-200 text-white text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.01] active:scale-[0.99]"
+        style={{
+          background: selectedGenres.length === 0
+            ? 'var(--cw-surface-elevated)'
+            : 'linear-gradient(135deg, var(--cw-accent), color-mix(in srgb, var(--cw-accent) 70%, #a855f7))',
+          boxShadow: selectedGenres.length === 0 ? 'none' : '0 4px 16px color-mix(in srgb, var(--cw-accent) 35%, transparent)',
+        }}
       >
         {submitLabel}
       </button>
@@ -398,8 +424,7 @@ export function RecommendationsPage() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         <h1 className="text-2xl font-bold text-slate-100 mb-2">Your Recommendations</h1>
         <p className="text-slate-400 mb-6 text-sm">Tell us what you enjoy to get started.</p>
-        <div className="max-w-xl">
-          <PreferenceForm
+        <PreferenceForm
             availableGenres={availableGenres}
             selectedGenres={selectedGenres}
             selectedMood={selectedMood}
@@ -409,7 +434,6 @@ export function RecommendationsPage() {
             submitLabel="Get My Recommendations"
             showValidationError={showValidationError}
           />
-        </div>
       </div>
     );
   }
@@ -452,7 +476,7 @@ export function RecommendationsPage() {
               {showForm ? 'Hide' : 'Edit Preferences'}
             </button>
             {showForm && (
-              <div className="mt-4 max-w-xl">
+              <div className="mt-4">
                 <PreferenceForm
                   availableGenres={availableGenres}
                   selectedGenres={selectedGenres}
