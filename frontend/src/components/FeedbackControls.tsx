@@ -30,7 +30,7 @@ export function FeedbackControls({
 
   return (
     <div className="mt-6 pt-5 border-t" style={{ borderColor: 'var(--cw-border)' }}>
-      <p className="mb-3 text-xs font-semibold text-slate-400">How was it?</p>
+      <p className="mb-3 text-xs font-semibold text-slate-400">Seen it?</p>
       <div className="flex gap-2">
         <button
           type="button"

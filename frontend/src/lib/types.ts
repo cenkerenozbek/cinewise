@@ -7,6 +7,8 @@ export interface MovieSummary {
   poster_path: string | null;
   backdrop_path: string | null;
   rating: number | null;
+  /** Personalized "Because you…" reason, present only for recommendation rows. */
+  explanation?: string;
 }
 
 export interface MovieDetail extends MovieSummary {

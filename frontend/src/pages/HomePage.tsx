@@ -321,6 +321,7 @@ export function HomePage() {
     poster_path: r.poster_path,
     backdrop_path: r.backdrop_path,
     rating: r.rating,
+    explanation: r.explanation,
   }));
   const usePersonalizedHero = shouldShowPersonalized && recMovies.length >= HERO_COUNT;
   const shuffledRecMovies = useMemo(() => {

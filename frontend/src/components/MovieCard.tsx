@@ -73,6 +73,13 @@ export function MovieCard({ movie, onClick, actionSlot, variant = 'grid' }: Movi
             {movie.genres.slice(0, 3).join(', ')}
           </p>
         )}
+
+        {/* Personalized reason (recommendation rows only) */}
+        {movie.explanation && (
+          <p className="text-xs leading-5 italic line-clamp-2 w-[220px] text-slate-400">
+            {movie.explanation}
+          </p>
+        )}
       </div>
     );
 
