@@ -20,12 +20,47 @@ import logging
 import os
 import statistics
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+
+def _make_user_tokens(n: int) -> list[str]:
+    """Generate N synthetic JWT tokens (one per simulated user) using JWT_SECRET.
+
+    Each token gives the simulated user its own rate-limit bucket (60/min),
+    so 10 users can sustain 10×60 = 600 req/min without hitting the IP limit.
+    Returns empty list if JWT_SECRET is unset; benchmark then runs
+    unauthenticated (single IP bucket, limited to 60/min total).
+    """
+    import base64
+    import hashlib
+    import hmac
+
+    secret = os.environ.get("JWT_SECRET", "")
+    if not secret:
+        return []
+
+    def _b64url(data: bytes) -> str:
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+    header = _b64url(b'{"alg":"HS256","typ":"JWT"}')
+    now = int(datetime.now(timezone.utc).timestamp())
+    tokens = []
+    for i in range(n):
+        payload_json = (
+            f'{{"sub":"bench_user_{i}","iat":{now},"exp":{now + 3600}}}'
+        ).encode()
+        payload = _b64url(payload_json)
+        signing_input = f"{header}.{payload}".encode()
+        sig = hmac.new(secret.encode(), signing_input, hashlib.sha256).digest()
+        tokens.append(f"{header}.{payload}.{_b64url(sig)}")
+    logger.info("Generated %d per-user JWT tokens for rate-limit isolation", n)
+    return tokens
+
 
 # p95 SLA targets in milliseconds
 SLA_RECOMMENDATIONS_MS = 3000
@@ -64,13 +99,15 @@ async def measure_recommendation(
     client: httpx.AsyncClient,
     base_url: str,
     worker_id: int,
+    token: str = "",
 ) -> float:
     """Send one recommendation request, return elapsed ms."""
     genres = _GENRE_SETS[worker_id % len(_GENRE_SETS)]
     mood = _MOODS[worker_id % len(_MOODS)]
     payload = {"genres": genres, "mood": mood}
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     start = time.perf_counter()
-    resp = await client.post(f"{base_url}/api/recommendations", json=payload)
+    resp = await client.post(f"{base_url}/api/recommendations", json=payload, headers=headers)
     elapsed_ms = (time.perf_counter() - start) * 1000
     resp.raise_for_status()
     return elapsed_ms
@@ -80,11 +117,13 @@ async def measure_search(
     client: httpx.AsyncClient,
     base_url: str,
     worker_id: int,
+    token: str = "",
 ) -> float:
     """Send one search request, return elapsed ms."""
     query = _SEARCH_QUERIES[worker_id % len(_SEARCH_QUERIES)]
+    headers = {"Authorization": f"Bearer {token}"} if token else {}
     start = time.perf_counter()
-    resp = await client.get(f"{base_url}/api/movies", params={"q": query, "page": 1})
+    resp = await client.get(f"{base_url}/api/movies", params={"q": query, "page": 1}, headers=headers)
     elapsed_ms = (time.perf_counter() - start) * 1000
     resp.raise_for_status()
     return elapsed_ms
@@ -94,18 +133,19 @@ async def run_concurrent_round(
     base_url: str,
     concurrency: int,
     endpoint: str,
+    tokens: list[str],
 ) -> list[float]:
     """Fire `concurrency` requests simultaneously, return list of elapsed_ms."""
     limits = httpx.Limits(max_connections=concurrency + 5, max_keepalive_connections=concurrency)
     async with httpx.AsyncClient(limits=limits, timeout=30.0) as client:
         if endpoint == "recommendations":
             tasks = [
-                measure_recommendation(client, base_url, i)
+                measure_recommendation(client, base_url, i, tokens[i] if tokens else "")
                 for i in range(concurrency)
             ]
         else:
             tasks = [
-                measure_search(client, base_url, i)
+                measure_search(client, base_url, i, tokens[i] if tokens else "")
                 for i in range(concurrency)
             ]
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -150,12 +190,13 @@ async def benchmark(
     rounds: int,
     endpoint: str,
     sla_ms: int,
+    tokens: list[str],
 ) -> dict:
     logger.info(f"Benchmarking {endpoint} — {concurrency} concurrent users, {rounds} rounds ...")
     all_timings: list[float] = []
 
     for r in range(1, rounds + 1):
-        timings = await run_concurrent_round(base_url, concurrency, endpoint)
+        timings = await run_concurrent_round(base_url, concurrency, endpoint, tokens)
         all_timings.extend(timings)
         if r % 5 == 0 or r == rounds:
             partial = compute_stats(all_timings)
@@ -205,13 +246,15 @@ async def main() -> None:
             logger.error(f"Warm-up failed — is the backend running at {args.base_url}? ({e})")
             return
 
+    tokens = _make_user_tokens(args.concurrency)
+
     rec_result = await benchmark(
         args.base_url, args.concurrency, args.rounds,
-        "recommendations", SLA_RECOMMENDATIONS_MS,
+        "recommendations", SLA_RECOMMENDATIONS_MS, tokens,
     )
     search_result = await benchmark(
         args.base_url, args.concurrency, args.rounds,
-        "search", SLA_SEARCH_MS,
+        "search", SLA_SEARCH_MS, tokens,
     )
 
     overall_pass = rec_result["passed"] and search_result["passed"]
