@@ -82,7 +82,7 @@ export function Navbar() {
     setActiveMood(next);
     setMoodOpen(false);
     if (isAuthenticated) {
-      saveMutation.mutate({ genres: savedPrefs?.genres ?? [], mood: next ?? undefined });
+      saveMutation.mutate({ genres: savedPrefs?.genres ?? [], mood: next ?? null });
     }
   }
 
