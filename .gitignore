@@ -20,8 +20,11 @@ node_modules/
 .env
 !.env.example
 
-# Artifacts (precomputed ML files)
+# Artifacts (precomputed ML files) — exclude everywhere except backend/artifacts
 artifacts/
+!backend/artifacts/
+!backend/artifacts/*.joblib
+!backend/artifacts/*.json
 
 # OS
 .DS_Store
