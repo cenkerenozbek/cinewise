@@ -23,7 +23,7 @@ export function useRecommendations(
       return data;
     },
     enabled: genres.length > 0,
-    staleTime: 0,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

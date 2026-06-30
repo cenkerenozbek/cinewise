@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useMovieDetail, useMovieTrailer } from '../hooks/useMovies';
+import { useMovieDetail, useMovieTrailer, useSimilarMovies } from '../hooks/useMovies';
 import { FeedbackControls } from '../components/FeedbackControls';
 import { WatchlistButton } from '../components/WatchlistButton';
+import { MovieCard } from '../components/MovieCard';
 import { useAuth } from '../hooks/useAuth';
 import { useFeedback, useDeleteFeedback, useMovieFeedback } from '../hooks/useFeedback';
 import type { FeedbackAction, WatchCompletion } from '../lib/types';
@@ -10,6 +11,63 @@ import { WATCH_COMPLETION_VALUES, WATCH_COMPLETION_REVERSE } from '../lib/types'
 
 const TMDB_POSTER_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_BACKDROP_BASE = 'https://image.tmdb.org/t/p/w1280';
+
+function SimilarMoviesRow({ tmdbId, genres }: { tmdbId: number; genres: string[] }) {
+  const rowRef = useRef<HTMLDivElement>(null);
+  const { data, isLoading } = useSimilarMovies(tmdbId, genres);
+  const similar = (data?.movies ?? []).filter((m) => m.tmdb_id !== tmdbId).slice(0, 12);
+
+  function scroll(dir: 'left' | 'right') {
+    rowRef.current?.scrollBy({ left: dir === 'right' ? 260 : -260, behavior: 'smooth' });
+  }
+
+  if (!isLoading && similar.length === 0) return null;
+
+  return (
+    <section className="mt-14 pb-16">
+      <h2 className="text-2xl font-black text-slate-100 mb-6">You Might Also Like</h2>
+      <div className="relative">
+        <button
+          onClick={() => scroll('left')}
+          className="absolute -left-5 top-[160px] -translate-y-1/2 z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
+          style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)' }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+
+        <div
+          ref={rowRef}
+          className="flex gap-6 overflow-x-auto pb-4"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
+          {isLoading
+            ? Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="shrink-0 w-[200px]">
+                  <div className="w-[200px] h-[300px] rounded-xl animate-pulse" style={{ background: 'var(--cw-surface-elevated)' }} />
+                  <div className="mt-3 h-3 w-20 rounded animate-pulse" style={{ background: 'var(--cw-surface-elevated)' }} />
+                  <div className="mt-2 h-4 w-36 rounded animate-pulse" style={{ background: 'var(--cw-surface-elevated)' }} />
+                </div>
+              ))
+            : similar.map((movie) => (
+                <MovieCard key={movie.tmdb_id} movie={movie} variant="row" />
+              ))}
+        </div>
+
+        <button
+          onClick={() => scroll('right')}
+          className="absolute -right-5 top-[160px] -translate-y-1/2 z-10 w-10 h-10 rounded-full flex items-center justify-center transition-all hover:scale-110"
+          style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(8px)', border: '1px solid rgba(255,255,255,0.2)' }}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+    </section>
+  );
+}
 
 export function MovieDetailPage() {
   const navigate = useNavigate();
@@ -264,6 +322,8 @@ export function MovieDetailPage() {
             )}
           </div>
         )}
+
+        <SimilarMoviesRow tmdbId={movie.tmdb_id} genres={movie.genres} />
       </div>
     </div>
   );

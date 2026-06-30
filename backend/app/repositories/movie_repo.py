@@ -26,6 +26,9 @@ class MovieRepository:
         year: int | None,
         page: int = 1,
         page_size: int = 20,
+        sort_by: str | None = None,
+        min_votes: int | None = None,
+        min_rating: float | None = None,
     ) -> tuple[list[dict], int]:
         """Search/filter movies and return (page_of_docs, total_count).
 
@@ -55,13 +58,23 @@ class MovieRepository:
         if year:
             filters["year"] = year
 
+        if min_votes is not None:
+            filters["vote_count"] = {"$gte": min_votes}
+
+        if min_rating is not None:
+            filters.setdefault("rating", {})
+            if isinstance(filters["rating"], dict):
+                filters["rating"]["$gte"] = min_rating
+            else:
+                filters["rating"] = {"$gte": min_rating}
+
         skip = (page - 1) * page_size
 
         cursor = self.collection.find(filters)
 
         if not query:
-            # Sort by popularity descending when no text search
-            cursor = cursor.sort("popularity", -1)
+            sort_field = "vote_count" if sort_by == "votes" else "popularity"
+            cursor = cursor.sort(sort_field, -1)
 
         total = await self.collection.count_documents(filters)
         docs = await cursor.skip(skip).limit(page_size).to_list(length=page_size)

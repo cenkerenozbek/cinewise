@@ -18,9 +18,12 @@ class MovieService:
         year: int | None,
         page: int,
         page_size: int,
+        sort_by: str | None = None,
+        min_votes: int | None = None,
+        min_rating: float | None = None,
     ) -> MovieListResponse:
         """Return a paginated list of movies matching the given filters."""
-        docs, total = await self._repo.search(query, genre, year, page, page_size)
+        docs, total = await self._repo.search(query, genre, year, page, page_size, sort_by, min_votes, min_rating)
         movies = [MovieSummary(**_to_summary(doc)) for doc in docs]
         return MovieListResponse(movies=movies, total=total, page=page, page_size=page_size)
 

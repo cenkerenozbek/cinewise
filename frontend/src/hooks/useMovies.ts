@@ -52,6 +52,61 @@ export function useMovieTrailer(tmdbId: number) {
   });
 }
 
+export function usePopularMovies(count: number) {
+  return useQuery<MovieListResponse>({
+    queryKey: ['movies', 'popular', count],
+    queryFn: async () => {
+      const { data } = await api.get<MovieListResponse>(
+        `/movies?sort_by=votes&min_votes=50000&min_rating=7.0&page_size=${count}`
+      );
+      return data;
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useForYouMovies(primaryGenre: string, pageSize: number) {
+  return useQuery<MovieListResponse>({
+    queryKey: ['for-you-movies', primaryGenre, pageSize],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (primaryGenre) params.set('genre', primaryGenre);
+      params.set('page_size', String(pageSize));
+      const { data } = await api.get<MovieListResponse>(`/movies?${params}`);
+      return data;
+    },
+    enabled: !!primaryGenre && pageSize > 0,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useSimilarMovies(tmdbId: number, genres: string[]) {
+  const primaryGenre = genres[0] ?? '';
+  return useQuery<MovieListResponse>({
+    queryKey: ['similar-movies', tmdbId, primaryGenre],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (primaryGenre) params.set('genre', primaryGenre);
+      params.set('page_size', '13');
+      const { data } = await api.get<MovieListResponse>(`/movies?${params}`);
+      return data;
+    },
+    enabled: !!tmdbId && genres.length > 0,
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useBrowseAll(pageSize: number) {
+  return useQuery<MovieListResponse>({
+    queryKey: ['movies', 'browse', pageSize],
+    queryFn: async () => {
+      const { data } = await api.get<MovieListResponse>(`/movies?page_size=${pageSize}`);
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useGenres() {
   return useQuery<string[]>({
     queryKey: ['genres'],

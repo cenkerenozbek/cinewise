@@ -27,8 +27,11 @@ async def list_movies(
     q: str | None = None,
     genre: str | None = None,
     year: int | None = None,
+    sort_by: str | None = None,
+    min_votes: int | None = None,
+    min_rating: float | None = None,
     page: Annotated[int, Query(ge=1)] = 1,
-    page_size: Annotated[int, Query(ge=1, le=100)] = 20,
+    page_size: Annotated[int, Query(ge=1, le=200)] = 20,
     service: MovieService = Depends(_get_movie_service),
 ) -> MovieListResponse:
     """Return a paginated list of movies.
@@ -37,10 +40,13 @@ async def list_movies(
     - **q**: Case-insensitive title search
     - **genre**: Filter to movies that include this genre
     - **year**: Filter to movies released in this year
+    - **sort_by**: "votes" sorts by vote_count desc, default is popularity
+    - **min_votes**: Minimum vote_count threshold
+    - **min_rating**: Minimum rating threshold
     - **page**: Page number (default 1)
     - **page_size**: Results per page (default 20)
     """
-    return await service.list_movies(q, genre, year, page, page_size)
+    return await service.list_movies(q, genre, year, page, page_size, sort_by, min_votes, min_rating)
 
 
 @router.get("/genres", response_model=GenresResponse)

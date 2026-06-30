@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useMovieSearch, useMovieDetail, useMovieTrailer } from '../hooks/useMovies';
+import { useMovieSearch, useMovieDetail, useMovieTrailer, useBrowseAll, useForYouMovies } from '../hooks/useMovies';
 import { useRecommendations, useUserPreferences } from '../hooks/useRecommendations';
 import { MovieCard } from '../components/MovieCard';
 import { MovieGrid } from '../components/MovieGrid';
@@ -274,7 +274,10 @@ export function HomePage() {
   const [genre, setGenre] = useState('');
   const [year, setYear] = useState('');
   const [page, setPage] = useState(1);
+  const [browseLimit, setBrowseLimit] = useState<50 | 100 | 200>(50);
+  const [forYouLimit, setForYouLimit] = useState<50 | 100 | 200>(50);
   const { data, isLoading } = useMovieSearch(query, genre, year, page);
+  const { data: browseData, isLoading: browseLoading } = useBrowseAll(browseLimit);
   const { data: savedPrefs, isLoading: prefsLoading } = useUserPreferences(
     isAuthenticated,
     user?.id ?? 'anonymous',
@@ -340,6 +343,16 @@ export function HomePage() {
   const featuredMovies = movies.slice(HERO_COUNT, HERO_COUNT + 8);
   const newArrivals = movies.slice(HERO_COUNT + 8, HERO_COUNT + 16);
   const bgColor = isDark ? 'var(--cw-bg)' : '#ffffff';
+  const browseMovies = browseData?.movies ?? [];
+
+  const primaryGenre = savedPrefs?.genres[0] ?? '';
+  const { data: forYouMoviesData, isLoading: forYouMoviesLoading } = useForYouMovies(
+    shouldShowPersonalized ? primaryGenre : '',
+    forYouLimit,
+  );
+  const mlRecIds = new Set(recMovies.map((m) => m.tmdb_id));
+  const genreFillMovies = (forYouMoviesData?.movies ?? []).filter((m) => !mlRecIds.has(m.tmdb_id));
+  const forYouGridMovies = [...recMovies, ...genreFillMovies].slice(0, forYouLimit);
 
   // Search / filter mode → show grid view
   if (isSearching) {
@@ -407,12 +420,39 @@ export function HomePage() {
 
         {shouldShowPersonalized && (
           <section className="mb-14">
-            <SectionTitle title={usePersonalizedHero ? "More For You" : "For You"} linkTo="/recommendations" />
-            {personalizedLoading ? (
-              <MovieRow movies={[]} loading />
-            ) : forYouRowMovies.length > 0 ? (
-              <MovieRow movies={forYouRowMovies} />
-            ) : null}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-3">
+                <h2 className="text-3xl font-black" style={{ color: isDark ? '#f1f5f9' : '#111827' }}>
+                  {usePersonalizedHero ? 'More For You' : 'For You'}
+                </h2>
+                <Link to="/recommendations" className="flex items-center gap-1 text-base font-medium hover:opacity-70 transition-opacity" style={{ color: 'var(--cw-accent)' }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm mr-1" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>Show:</span>
+                {([50, 100, 200] as const).map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => setForYouLimit(n)}
+                    className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                    style={
+                      forYouLimit === n
+                        ? { background: 'var(--cw-accent)', color: '#fff', border: '1.5px solid transparent' }
+                        : { background: 'transparent', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.15)' : '#d1d5db'}` }
+                    }
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <MovieGrid
+              movies={forYouGridMovies}
+              isLoading={personalizedLoading || forYouMoviesLoading}
+            />
           </section>
         )}
 
@@ -432,14 +472,30 @@ export function HomePage() {
           </section>
         )}
 
-        {/* Browse All — for unauthenticated users */}
-        {!isAuthenticated && (
-          <section className="mb-14">
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-              <FilterDropdowns genre={genre} year={year} onGenreChange={handleGenreChange} onYearChange={handleYearChange} />
+        {/* Browse All */}
+        <section className="mb-14">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            <h2 className="text-3xl font-black" style={{ color: isDark ? '#f1f5f9' : '#111827' }}>Browse All</h2>
+            <div className="flex items-center gap-2">
+              <span className="text-sm mr-1" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : '#6b7280' }}>Show:</span>
+              {([50, 100, 200] as const).map((n) => (
+                <button
+                  key={n}
+                  onClick={() => setBrowseLimit(n)}
+                  className="px-4 py-1.5 rounded-full text-sm font-semibold transition-all"
+                  style={
+                    browseLimit === n
+                      ? { background: 'var(--cw-accent)', color: '#fff', border: '1.5px solid transparent' }
+                      : { background: 'transparent', color: isDark ? 'rgba(255,255,255,0.6)' : '#6b7280', border: `1.5px solid ${isDark ? 'rgba(255,255,255,0.15)' : '#d1d5db'}` }
+                  }
+                >
+                  {n}
+                </button>
+              ))}
             </div>
-          </section>
-        )}
+          </div>
+          <MovieGrid movies={browseMovies} isLoading={browseLoading} />
+        </section>
       </div>
 
       <Footer />

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useGenres, useMovieSearch } from '../hooks/useMovies';
+import { useGenres, usePopularMovies } from '../hooks/useMovies';
 import { useSaveUserPreferences } from '../hooks/useRecommendations';
 import { useFeedback } from '../hooks/useFeedback';
 import { useUpdateProfile } from '../hooks/useProfile';
@@ -25,12 +25,12 @@ export function OnboardingPage() {
   const [ratedMovies, setRatedMovies] = useState<Map<number, 'like' | 'dislike'>>(new Map());
 
   const { data: genresData } = useGenres();
-  const { data: popularMoviesData } = useMovieSearch('', '', '', 1);
+  const { data: popularMoviesData } = usePopularMovies(24);
   const { mutate: savePrefs } = useSaveUserPreferences(user?.id ?? 'anon');
   const { mutate: submitFeedback } = useFeedback();
   const { mutate: updateProfile } = useUpdateProfile();
 
-  const popularMovies = (popularMoviesData?.movies ?? []).slice(0, 8);
+  const popularMovies = popularMoviesData?.movies ?? [];
   const availableGenres = genresData ?? [];
 
   function handleGenreToggle(g: string) {
@@ -39,9 +39,21 @@ export function OnboardingPage() {
     );
   }
 
-  function handleRate(movieId: number, action: 'like' | 'dislike') {
-    setRatedMovies((prev) => new Map(prev).set(movieId, action));
-    submitFeedback({ movie_id: movieId, action });
+  function handleToggle(movieId: number) {
+    setRatedMovies((prev) => {
+      const next = new Map(prev);
+      const current = next.get(movieId);
+      if (current === 'like') {
+        next.set(movieId, 'dislike');
+        submitFeedback({ movie_id: movieId, action: 'dislike' });
+      } else if (current === 'dislike') {
+        next.delete(movieId);
+      } else {
+        next.set(movieId, 'like');
+        submitFeedback({ movie_id: movieId, action: 'like' });
+      }
+      return next;
+    });
   }
 
   function handleFinish() {
@@ -168,66 +180,67 @@ export function OnboardingPage() {
       ),
     },
     {
-      title: 'Rate a few popular films',
-      subtitle: 'This seeds your recommendation engine instantly.',
+      title: 'Pick films you know',
+      subtitle: 'Tap a film to rate it. Tap again to change. All films stay visible.',
       canProceed: true,
       onNext: undefined,
       content: (
-        <div className="grid grid-cols-4 gap-3">
-          {popularMovies.map((movie) => {
-            const vote = ratedMovies.get(movie.tmdb_id);
-            return (
-              <div key={movie.tmdb_id} className="flex flex-col gap-1.5">
-                <div
-                  className={`relative rounded-lg overflow-hidden aspect-[2/3] transition-all ${vote ? 'ring-2' : ''} ${vote === 'like' ? 'ring-green-400' : vote === 'dislike' ? 'ring-red-400' : ''}`}
-                  style={{ background: 'var(--cw-surface-elevated)' }}
+        <div>
+          <div className="flex items-center gap-4 mb-4 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-green-500 inline-block" /> Loved it
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-red-500 inline-block" /> Not for me
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full inline-block" style={{ background: 'var(--cw-surface-elevated)' }} /> Not seen / skip
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-2.5 max-h-[500px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+            {popularMovies.map((movie) => {
+              const vote = ratedMovies.get(movie.tmdb_id);
+              return (
+                <button
+                  key={movie.tmdb_id}
+                  type="button"
+                  onClick={() => handleToggle(movie.tmdb_id)}
+                  className="relative rounded-lg overflow-hidden aspect-[2/3] group focus:outline-none transition-transform hover:scale-[1.02]"
+                  style={{
+                    background: 'var(--cw-surface-elevated)',
+                    outline: vote === 'like' ? '2.5px solid #22c55e' : vote === 'dislike' ? '2.5px solid #ef4444' : '2px solid transparent',
+                    outlineOffset: '1px',
+                  }}
                 >
                   {movie.poster_path && (
-                    <img src={`${TMDB_POSTER_BASE}${movie.poster_path}`} alt={movie.title} className="w-full h-full object-cover" loading="lazy" />
+                    <img
+                      src={`${TMDB_POSTER_BASE}${movie.poster_path}`}
+                      alt={movie.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
                   )}
-                </div>
-                <p className="text-xs text-slate-400 truncate text-center">{movie.title}</p>
-                <div className="grid grid-cols-3 gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleRate(movie.tmdb_id, 'like')}
-                    className={`flex items-center justify-center rounded py-1.5 transition-all ${vote === 'like' ? 'bg-green-500/30 text-green-300' : 'bg-white/5 text-slate-400 hover:text-green-300'}`}
-                    title="Love it"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setRatedMovies((prev) => {
-                        const next = new Map(prev);
-                        next.delete(movie.tmdb_id);
-                        return next;
-                      });
-                    }}
-                    className="flex items-center justify-center rounded py-1.5 bg-white/5 text-slate-500 hover:text-slate-300 transition-all"
-                    title="Skip"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12h12" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleRate(movie.tmdb_id, 'dislike')}
-                    className={`flex items-center justify-center rounded py-1.5 transition-all ${vote === 'dislike' ? 'bg-red-500/30 text-red-300' : 'bg-white/5 text-slate-400 hover:text-red-300'}`}
-                    title="Not for me"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
+                  {/* dark overlay on hover */}
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                  {/* vote badge */}
+                  {vote && (
+                    <div className={`absolute top-1.5 right-1.5 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold shadow-lg ${vote === 'like' ? 'bg-green-500' : 'bg-red-500'}`}>
+                      {vote === 'like' ? '✓' : '✕'}
+                    </div>
+                  )}
+                  {/* title on hover */}
+                  <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                    <p className="text-[10px] text-white font-medium line-clamp-2 leading-tight">{movie.title}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {ratedMovies.size > 0 && (
+            <p className="mt-3 text-xs text-slate-400 text-center">
+              {[...ratedMovies.values()].filter(v => v === 'like').length} loved · {[...ratedMovies.values()].filter(v => v === 'dislike').length} not for me
+            </p>
+          )}
         </div>
       ),
     },
